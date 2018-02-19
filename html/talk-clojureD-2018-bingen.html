@@ -1,0 +1,519 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta content="text/html; charset=utf-8" http-equiv="Content-Type">
+<meta content="IE=edge,chrome=1" http-equiv="X-UA-Compatible">
+<meta content="Asciidoctor 1.5.6.1" name="generator">
+<title>DIY random generation of binary and general trees</title>
+<link href="deck.js/core/deck.core.css" rel="stylesheet">
+<link href="deck.js/extensions/menu/deck.menu.css" media="screen" rel="stylesheet">
+<link href="deck.js/extensions/navigation/deck.navigation.css" media="screen" rel="stylesheet">
+<link href="deck.js/extensions/status/deck.status.css" media="screen" rel="stylesheet">
+<link href="deck.js/themes/style/.css" media="screen" rel="stylesheet">
+<link href="deck.js/themes/transition/horizontal-slide.css" media="screen" rel="stylesheet">
+<link href="deck.js/core/print.css" media="print" rel="stylesheet">
+<script src="deck.js/modernizr.custom.js"></script>
+</head>
+<body class="article">
+<div class="deck-container">
+<section class="slide" id="title-slide">
+<h1>DIY random generation of binary and general trees</h1>
+</section>
+<div id="preamble">
+<div class="sectionbody">
+<pre class="hidden"><code class="clj">
+(ns my.m$macros)
+(require '[reagent.core :as r])
+(require '[reagent.ratom :as ratom])
+
+</code></pre>
+</div>
+</div>
+<section class="slide" id="_diy_random_generation_of_binary_and_general_trees">
+<h2>DIY random generation of binary and general trees</h2>
+<br/>
+<br/>
+<br/>
+  <div class="left">
+    <div>
+      <img width="200px" src="./images/clojureD.png"/>
+    </div>
+
+  <div>Berlin - Feb 24, 2018</div>
+  </div>
+<div class="left" style="padding-left: 30px;">
+<code data-loop-msec="1000" class="reagent" data-beautify-strings="true">
+;; A live-coding presentation made with klipse
+;; (thank you Yeonathan/viebel!)
+(defn showme [s] [:h3 (str s)])
+[:div (showme (js/Date.))]
+</code>
+</div>
+<br/>
+<br/>
+<br/>
+<br/>
+<br/>
+<br/>
+<br/>
+<hr>
+<div class="openblock slide">
+<div class="content">
+<div class="paragraph"><p><strong>Who am I?</strong> <a href="mailto:frederic.peschanski@lip6.fr">frederic.peschanski@lip6.fr</a>&#8201;&#8212;&#8201;<a href="https://github.com/fredokun">fredokun @ github</a></p></div>
+<div class="ulist">
+<ul>
+<li>associate professor at <a href="http://www.sorbonne-university.com/">Sorbonne University</a> (ex-UPMC)</li>
+<li>researcher at the <a href="https://www.lip6.fr">Lip6</a> computer science laboratory</li>
+<li>(live) programming &amp; maths geek</li>
+<li>long-time Lisper (scheme, CL, clojure(script))</li>
+</ul>
+</div>
+</div>
+</div>
+</section>
+<section class="slide" id="_agenda">
+<h2>Agenda</h2>
+<div class="ulist">
+<ul>
+<li>Generating binary trees</li>
+<li>Genearting general trees</li>
+</ul>
+</div>
+<hr>
+<div class="paragraph"><p><strong>Remark</strong>: this presentation is a complement to the main presentation<br>
+about <strong>Boltzmann sampling</strong>.</p></div>
+<hr>
+<div class="paragraph slide"><p><strong>Warning !</strong> this presentation is <strong>code heavy</strong>! The whole source code is in the slides,<br>
+we&#8217;ll need to skip some parts (but you can play with the whole bunch online&#8230;&#8203;)</p></div>
+</section>
+<section class="slide" id="_random_sources_from_test_check">
+<h2>Random sources (from test.check)</h2>
+<div class="listingblock clj">
+<div class="content">
+<pre class="highlight"><code>(require '[clojure.test.check.random&#x000A;         :refer [make-random  ;; create source with seed&#x000A;	         split        ;; two generators from one&#x000A;		 rand-double  ;; uniform double in range [0.0;1.0[&#x000A;		 rand-long    ;; uniform long (64 bits java, js ?)&#x000A;		 ]])&#x000A;&#x000A;;; generate a double between 0.0 (inclusive) and 1.0 (exclusive)&#x000A;(defn next-double [src]&#x000A;  (let [[src' src''] (split src)] ;; XXX: throw src?&#x000A;    [(rand-double src') src'']))&#x000A;&#x000A;(next-double (make-random 424242))&#x000A;&#x000A;""</code></pre>
+</div>
+</div>
+<div class="listingblock clj">
+<div class="content">
+<pre class="highlight"><code>;; generate an integer in some range&#x000A;(defn next-int [src mini maxi]&#x000A;  (let [[x src'] (next-double src)]&#x000A;    [(int (+ (* (- maxi mini) x)&#x000A;             mini)) src']))&#x000A;&#x000A;(next-int (make-random 424242) 24 450)&#x000A;""</code></pre>
+</div>
+</div>
+<div class="listingblock clj">
+<div class="content">
+<pre class="highlight"><code>;; coin flips&#x000A;(defn next-bool [src]&#x000A;  (let [[x src'] (next-double src)]&#x000A;    [(&lt; x 0.5) src']))  ;; XXX: random bits leak !&#x000A;&#x000A;(next-bool (make-random 424242))&#x000A;""</code></pre>
+</div>
+</div>
+</section>
+<section class="slide" id="_binary_trees">
+<h2>Binary trees</h2>
+<div class="listingblock clj">
+<div class="content">
+<pre class="highlight"><code>(require '[clojure.spec :as s])&#x000A;&#x000A;;; a spec for binary trees (with keyword labels)&#x000A;(s/def ::bintree&#x000A;  (s/or :tip nil?&#x000A;        :node (s/tuple ::label ::bintree ::bintree)))&#x000A;(s/def ::label int?)&#x000A;&#x000A;;; example&#x000A;(def ex-btree [1,&#x000A;               [2 nil nil],&#x000A;               [3 [4 nil,&#x000A;                   [5 nil nil]],&#x000A;               [6 nil nil]]])&#x000A;&#x000A;(s/valid? ::bintree ex-btree)&#x000A;""</code></pre>
+</div>
+</div>
+<div class="paragraph"><p>Random generation from spec (via test.check):</p></div>
+<div class="listingblock clj">
+<div class="content">
+<pre class="highlight"><code>(require '[clojure.test.check.generators :as gen])&#x000A;&#x000A;(gen/generate (s/gen ::bintree) 10)&#x000A;""</code></pre>
+</div>
+</div>
+<div class="paragraph slide"><p><strong>Observations</strong><br>
+- non-uniform generation (it&#8217;s biased but don&#8217;t know how)<br>
+- lack of control: biased towards (very) small trees</p></div>
+</section>
+<section class="slide" id="_generating_binary_trees_with_test_check">
+<h2>Generating binary trees with test.check</h2>
+<div class="literalblock">
+<div class="content">
+<pre>Let's try the dedicated support for recursive structures</pre>
+</div>
+</div>
+<div class="listingblock clj">
+<div class="content">
+<pre class="highlight"><code>(def node-gen (fn [inner-gen]&#x000A;                (gen/tuple gen/int inner-gen inner-gen)))&#x000A;&#x000A;(def bt-gen (gen/recursive-gen node-gen (gen/return nil)))&#x000A;&#x000A;(gen/generate bt-gen 10)&#x000A;""</code></pre>
+</div>
+</div>
+<div class="paragraph slide"><p><strong>Observations</strong><br>
+- non-uniform generation (it&#8217;s biased but don&#8217;t know how)<br>
+- lack of control: small-ish trees</p></div>
+</section>
+<section class="slide" id="_uniformity">
+<h2>Uniformity?</h2>
+<div class="paragraph"><p>Unbiased sampling means sampling in the <strong>uniform</strong> distribution.</p></div>
+<div class="paragraph"><p>Defined for a <strong>combinatorial class</strong>:</p></div>
+<div class="ulist">
+<ul>
+<li class="slide">each object has a finite size <code>n</code></li>
+<li class="slide">there is a finite number <code>Cn</code> of objects of a given size</li>
+<li class="slide">uniform distribution: the probability of sampling an object of size <code>n</code><br>
+is <code>(/ 1.0 Cn)</code></li>
+</ul>
+</div>
+<div class="paragraph slide"><p>Binary trees as a combinatorial class:</p></div>
+<div class="ulist">
+<ul>
+<li class="slide">the size <code>n</code> of a tree is its number of (internal) nodes</li>
+<li class="slide">but what about <code>Cn</code>?<br>
+&nbsp; &nbsp;&nbsp;&nbsp; &#8658; <strong>Catalan numbers</strong></li>
+</ul>
+</div>
+</section>
+<section class="slide" id="_catalan_numbers_counting_binary_trees">
+<h2>Catalan numbers: counting binary trees</h2>
+<div class="listingblock clj">
+<div class="content">
+<pre class="highlight"><code>;; a point = a node or a tip (a `nil`)&#x000A;(defn nb-points [n] (+ (* 2 n) 1))&#x000A;&#x000A;;; a tip = a `nil` value&#x000A;(defn nb-tips [n] (inc n))&#x000A;&#x000A;;; counting binary trees (https://oeis.org/A000108)&#x000A;(defn catalans&#x000A;  ([] (cons 1 (cons 1 (catalans 1 1))))&#x000A;  ([n Cn] (lazy-seq (let [Cn+1 (* (/ (* 2 (nb-points n))&#x000A;                                     (nb-tips (inc n)))&#x000A;	        		Cn)]&#x000A;		    (cons Cn+1 (catalans (inc n) Cn+1))))))&#x000A;&#x000A;(take 10 (catalans))&#x000A;""</code></pre>
+</div>
+</div>
+<div class="listingblock clj">
+<div class="content">
+<pre class="highlight"><code>nil ;; tree of size 0</code></pre>
+</div>
+</div>
+</section>
+<section class="slide" id="_a_beautiful_bijection">
+<h2>A beautiful bijection</h2>
+<div class="paragraph"><p>&lt;academic-stuff&gt;</p></div>
+<img height="800" src="images/bijection.jpg">
+<div class="paragraph"><p>&lt;/academic-stuff&gt;</p></div>
+</section>
+<section class="slide" id="_the_generation_algorithm">
+<h2>The generation algorithm</h2>
+<div class="paragraph"><p>Incremental generation of a binary tree uniformly at random<br>
+(a.k.a. Remy algorithm)</p></div>
+<hr>
+<div class="paragraph"><p><strong>Input</strong>: a tree of size <code>n</code> taken uniformly at random<br>
+i.e. obtained with probabilty <code>(/ 1.0 (nth (catalans) n))</code></p></div>
+<hr>
+<div class="paragraph"><p><strong>Example</strong>: <code>[1 [2 nil nil] [3 nil nil]]</code></p></div>
+<div class="paragraph slide"><p><strong>Step 1</strong>: we pickup a "point" (either a node or a <code>nil</code>) uniformly at random<br>
+&nbsp;  &#8658; we need a random integer between <code>0</code> and <code>(* 2 n)</code><br>
+Example: we pickup the 4th point: <code>[1 [2 nil &lt;nil&gt;] [3 nil nil]]</code></p></div>
+<div class="paragraph slide"><p><strong>Step 2</strong>: We select a direction, either left or right<br>
+&nbsp; &#8658; We need a random boolean (coin flip)<br>
+Example: <code>:left</code></p></div>
+<div class="paragraph slide"><p><strong>Step 3</strong>: We build the tree of size n+1 according to the bijection, and remove the "mark"<br>
+Example: <code>[1 [2 nil [4 &lt;nil&gt; nil]] [3 nil nil]]</code></p></div>
+<div class="openblock slide">
+<div class="content">
+<div class="paragraph"><p>Finally, the generated tree is: <code>[1 [2 nil [4 nil nil]] [3 nil nil]]</code></p></div>
+<div class="paragraph"><p>&nbsp; &#8658; this tree has been taken with probability  <code>(/ 1.0 (nth (catalans) (inc n)))</code><br>
+&nbsp;&nbsp; (proof is easy thanks to the bijection&#8230;&#8203; but let&#8217;s skip it)</p></div>
+</div>
+</div>
+</section>
+<section class="slide" id="_tree_representation">
+<h2>Tree representation</h2>
+<div class="paragraph"><p>Step 1 (pickup a "point") is <strong>O(n)</strong> if we use the "classical" representation of binary trees.</p></div>
+<div class="paragraph"><p>&nbsp; &#8658; Alternative "vectorized" representation to achieve "almost" <strong>O(1)</strong></p></div>
+<div class="listingblock clj">
+<div class="content">
+<pre class="highlight"><code>(defn root [lbl]&#x000A;  [[lbl nil 1 2] #{0} #{0}])&#x000A;&#x000A;(defn append-leaf [vtree lbl parent side]&#x000A;  (let [[_ _ pleft pright] (nth vtree parent)&#x000A;        pside (if (= side :left) pleft pright)&#x000A;        tip-idx (count vtree)]&#x000A;    [(-&gt; vtree&#x000A;       (assoc pside [lbl parent tip-idx (inc tip-idx)])&#x000A;       (conj #{pside} #{pside})) pside]))&#x000A;&#x000A;;; representation of [:a nil nil]&#x000A;(root :a)&#x000A;""</code></pre>
+</div>
+</div>
+<div class="listingblock clj">
+<div class="content">
+<pre class="highlight"><code>;; [:a [:b nil nil] nil]&#x000A;(-&gt; (root :a)&#x000A;    (append-leaf :b 0 :left))&#x000A;""</code></pre>
+</div>
+</div>
+<div class="listingblock clj">
+<div class="content">
+<pre class="highlight"><code>;; [:a [:b nil [:c nil nil]] nil]&#x000A;(-&gt; (root :a)&#x000A;    (append-leaf :b 0 :left) (first)&#x000A;    (append-leaf :c 1 :right))&#x000A;""</code></pre>
+</div>
+</div>
+</section>
+<section class="slide" id="_from_classical_to_vectorized_binary_trees">
+<h2>From classical to vectorized binary trees</h2>
+<div class="listingblock clj">
+<div class="content">
+<pre class="highlight"><code>;; remark: tail-recursive&#x000A;(defn vbuild&#x000A;  ([t]&#x000A;   (if-let [[lbl left right] t]&#x000A;     (vbuild (root lbl) 0 :left left (list [0 :right right]))&#x000A;     []))&#x000A;  ([vtree parent side t cont]&#x000A;   ;; a node&#x000A;   (if-let [[lbl left right] t]&#x000A;     (let [[vtree' nparent] (append-leaf vtree lbl parent side)]&#x000A;       (recur vtree' nparent :left left (cons [nparent :right right] cont)))&#x000A;     ;; a nil&#x000A;     (if-let [[[parent' side' t'] &amp; cont'] cont]&#x000A;       (recur vtree parent' side' t' cont')&#x000A;       vtree))))&#x000A;&#x000A;(vbuild [:a [:b nil nil] nil])&#x000A;""</code></pre>
+</div>
+</div>
+</section>
+<section class="slide" id="_interlude_folding_vectorized_trees">
+<h2>Interlude: folding vectorized trees</h2>
+<div class="listingblock clj">
+<div class="content">
+<pre class="highlight"><code>;; the root is the only node with a  `nil` parent&#x000A;(defn search-root [vtree]&#x000A;  (loop [vtree vtree, idx 0]&#x000A;    (if (seq vtree)&#x000A;      (if (and (vector? (first vtree))&#x000A;               (nil? (second (first vtree))))&#x000A;        idx&#x000A;        (recur (rest vtree) (inc idx)))&#x000A;      ;; not found&#x000A;      nil)))&#x000A;&#x000A;;; a tail-recursive folder for vtrees&#x000A;;; (let's skip the details...)&#x000A;(defn vfold&#x000A;  ([f init vtree]&#x000A;   (let [root-idx (search-root vtree)]&#x000A;     (vfold f init root-idx vtree '())))&#x000A;  ([f init node-idx vtree cont]&#x000A;   (cond&#x000A;     (int? node-idx)&#x000A;     (let [node (nth vtree node-idx)]&#x000A;       (if (vector? node)&#x000A;         (let [[lbl _ left-idx right-idx] node]&#x000A;           (recur f init left-idx vtree (cons [::right lbl init right-idx] cont)))&#x000A;         ;; tip&#x000A;         (recur f init nil vtree cont)))&#x000A;     ;; continuation (tail-recursion)&#x000A;     (seq cont)&#x000A;     (case (ffirst cont)&#x000A;       ::right (let [[_ lbl racc right-idx] (first cont)]&#x000A;                 (recur f racc right-idx vtree (cons [::finish lbl init] (rest cont))))&#x000A;       ::finish (let [[_ lbl lacc] (first cont)]&#x000A;                  (recur f (f lbl lacc init) nil vtree (rest cont))))&#x000A;     :else ;; no more continuation&#x000A;     init)))&#x000A;&#x000A;(vfold #(+ 1 %2 %3) 0 (vbuild [:a nil [:b [:c nil [:d nil nil]] [:e nil nil]]]))&#x000A;""</code></pre>
+</div>
+</div>
+</section>
+<section class="slide" id="_from_vectorized_to_classical_binary_trees">
+<h2>From vectorized to classical binary trees</h2>
+<div class="listingblock clj">
+<div class="content">
+<pre class="highlight"><code>;; typical fold one-liner&#x000A;(defn vunbuild [vtree]&#x000A;  (vfold vector nil vtree))&#x000A;&#x000A;(vbuild [:a [:b nil nil] [:c nil nil]])&#x000A;""</code></pre>
+</div>
+</div>
+</section>
+<section class="slide" id="_apply_the_bijection_grafting">
+<h2>Apply the bijection = "Grafting"</h2>
+<div class="paragraph"><p><strong>Code size alert</strong>: grafting has several subcases<br>
+(let&#8217;s skip the details&#8230;&#8203;)</p></div>
+<div class="listingblock clj">
+<div class="content">
+<pre class="highlight"><code>(defn reparent [vtree parent old-child new-child]&#x000A;  (update vtree parent (fn [[plbl pparent pleft pright]]&#x000A;                         (if (= pleft old-child)&#x000A;                           [plbl pparent new-child pright]&#x000A;                           [plbl pparent pleft new-child]))))&#x000A;&#x000A;(defn newchild [lbl parent side other new]&#x000A;  (case side&#x000A;    :left [lbl parent other new]&#x000A;    :right [lbl parent new other]))&#x000A;&#x000A;(defn graft [vtree lbl where side]&#x000A;  (let [wnode (get vtree where)&#x000A;        graft-idx (count vtree)]&#x000A;    (if (vector? wnode)&#x000A;      ;; &lt;&lt;either a node&gt;&gt;&#x000A;      (let [[wlbl wparent wleft wright] wnode]&#x000A;        ;; node case&#x000A;        (as-&gt; vtree $&#x000A;            (if wparent (reparent $ wparent where graft-idx) $)&#x000A;            (assoc $ where [wlbl graft-idx wleft wright])&#x000A;            (conj $ (newchild lbl wparent side where (inc graft-idx))&#x000A;                  #{graft-idx})))&#x000A;      ;; &lt;&lt;or else a tip&gt;&gt;&#x000A;      (let [parent (first wnode)]&#x000A;        (-&gt; vtree&#x000A;            (reparent parent where graft-idx)&#x000A;            (assoc where #{graft-idx})&#x000A;            (conj (newchild lbl parent side where (inc graft-idx))&#x000A;                  #{graft-idx}))))))&#x000A;""</code></pre>
+</div>
+</div>
+</section>
+<section class="slide" id="_grafting_examples">
+<h2>Grafting examples</h2>
+<img height="300" src="images/bijection-zoom.jpg">
+<div class="listingblock clj">
+<div class="content">
+<pre class="highlight"><code>(vunbuild (root :a))&#x000A;""</code></pre>
+</div>
+</div>
+<div class="listingblock clj">
+<div class="content">
+<pre class="highlight"><code>(root :a)&#x000A;""</code></pre>
+</div>
+</div>
+<div class="listingblock clj">
+<div class="content">
+<pre class="highlight"><code>(vunbuild (-&gt; (root :a)&#x000A;              (graft :b 0 :left)))&#x000A;""</code></pre>
+</div>
+</div>
+</section>
+<section class="slide" id="_the_random_generation_algorithm">
+<h2>The random generation algorithm</h2>
+<div class="listingblock clj">
+<div class="content">
+<pre class="highlight"><code>(defn rand-bintree [src nb size vtree]&#x000A;  (if (= nb size)&#x000A;    [vtree src]&#x000A;    (let [;; step 1: pickup a "point"&#x000A;          [pos src'] (next-int src 0 (dec (count vtree)))&#x000A;	  ;; step 2: choose side: left (true) or right (false)&#x000A;          [left src''] (next-bool src')]&#x000A;      (recur src'' (inc nb) size&#x000A;             ;; step 3: apply bijection&#x000A;             (graft vtree (keyword (str (inc nb))) pos (if left :left :right))))))&#x000A;&#x000A;(rand-bintree (make-random 424242) 1 20 (root :1))&#x000A;""</code></pre>
+</div>
+</div>
+<div class="paragraph slide"><p><strong>Observations</strong><br>
+- uniform generation (we&#8217;ll see)<br>
+- controllable: the size parameter &#8230;&#8203; is &#8230;&#8203; the size of the tree<br>
+- efficient: generate quite large trees (linear time algo, tail-recursive)</p></div>
+</section>
+<section class="slide" id="_uniformity_2">
+<h2>Uniformity?</h2>
+<div class="paragraph"><p>The theory (analytic combinatorics) gives an asymptotic for the average height of binary trees.</p></div>
+<div class="listingblock clj">
+<div class="content">
+<pre class="highlight"><code>(defn avg-height-theory [size]&#x000A;  (* 2.0 (Math/sqrt (* Math/PI size))))&#x000A;&#x000A;(avg-height-theory 1000)&#x000A;""</code></pre>
+</div>
+</div>
+<div class="paragraph"><p>Let&#8217;s check this &#8230;&#8203;</p></div>
+<div class="listingblock clj">
+<div class="content">
+<pre class="highlight"><code>(defn vheight [vtree]&#x000A;  (vfold #(+ 1 (max %2 %3)) 0 vtree))&#x000A;&#x000A;(defn rand-bintrees [src size]&#x000A;  (lazy-seq (let [[vtree src'] (rand-bintree src 1 size (root :1))]&#x000A;               (cons vtree (rand-bintrees src' size)))))&#x000A;&#x000A;&#x000A;(defn avg-height-practice [seed nb size]&#x000A;  (/ (reduce + 0 (map vheight (take nb (rand-bintrees (make-random seed) size))))&#x000A;     nb))&#x000A;&#x000A;;; (time (avg-height-practice 14922 50 1000))&#x000A;""</code></pre>
+</div>
+</div>
+</section>
+<section class="slide" id="_general_trees">
+<h2>General trees</h2>
+<div class="listingblock clj">
+<div class="content">
+<pre class="highlight"><code>(s/def ::gentree (s/tuple keyword? (s/coll-of ::gentree :kind vector?)))&#x000A;&#x000A;(def ex-rtree [:1 [[:2 [[:3 []]&#x000A;                        [:4 [[:5 [[:6 []]]]]]]]&#x000A;                   [:7 []]&#x000A;                   [:8 [[:9 []]&#x000A;                        [:10 []]&#x000A;                        [:11 []]&#x000A;                        [:12 []]]]]])&#x000A;&#x000A;(s/valid? ::gentree ex-rtree)</code></pre>
+</div>
+</div>
+<div class="paragraph slide"><p><strong>Uniform random generation of general trees?</strong></p></div>
+</section>
+<section class="slide" id="_from_binary_to_general_trees_and_vice_versa">
+<h2>From binary to general trees (and vice-versa)</h2>
+<div class="paragraph"><p>Yet another bijection.</p></div>
+<div class="paragraph"><p>&lt;academic-stuff&gt;</p></div>
+<img height="800" src="images/bingen-bijection.jpg">
+<div class="paragraph"><p>&lt;/academic-stuff&gt;</p></div>
+</section>
+<section class="slide" id="_random_generation_of_general_trees">
+<h2>Random generation of general trees</h2>
+<div class="paragraph"><p><strong>Step 1</strong> : generate a binary tree uniformly at random (size <code>n</code>)</p></div>
+<div class="listingblock clj">
+<div class="content">
+<pre class="highlight"><code>(def mybtree (-&gt; (rand-bintree (make-random 424242) 1 10 (root :1))&#x000A;                 (first)&#x000A;		 (vunbuild)))&#x000A;&#x000A;mybtree&#x000A;""</code></pre>
+</div>
+</div>
+<div class="paragraph"><p><strong>Step 2</strong> : convert it to a forest (size <code>n</code>)</p></div>
+<div class="listingblock clj">
+<div class="content">
+<pre class="highlight"><code>(defn btree-&gt;forest [bt]&#x000A;  (if (nil? bt)&#x000A;    '()&#x000A;    (let [[lbl left right] bt&#x000A;          lefts (btree-&gt;forest left)&#x000A;          rights (btree-&gt;forest right)]&#x000A;      (cons [lbl (into [] lefts)]&#x000A;            rights))))&#x000A;&#x000A;(btree-&gt;forest mybtree)&#x000A;""</code></pre>
+</div>
+</div>
+<div class="paragraph"><p><strong>Step 3</strong> : add a root to obtain a general tree (size <code>n+1</code>)</p></div>
+<div class="listingblock clj">
+<div class="content">
+<pre class="highlight"><code>(def mygtree [:0 (into [] (btree-&gt;forest mybtree))])&#x000A;&#x000A;mygtree&#x000A;""</code></pre>
+</div>
+</div>
+<div class="paragraph slide"><p><strong>Observation</strong><br>
+- the forest is generated uniformly for size <code>n</code><br>
+- the general tree is generated uniformly for size <code>n+1</code><br>
+(there is only one way to put the root node)</p></div>
+</section>
+<section class="slide" id="_the_uniform_random_generator_for_general_trees">
+<h2>The uniform random generator for general trees</h2>
+<div class="listingblock clj">
+<div class="content">
+<pre class="highlight"><code>(defn rand-gentree [src size]&#x000A;  (let [;; step 1 : generate a binary tree uniformly at random&#x000A;         [vtree src'] (rand-bintree src 1 size (root :1))&#x000A;          btree (vunbuild vtree)&#x000A;          ;; step 2 : convert to a forest&#x000A;         forest (btree-&gt;forest btree)&#x000A;          ;; step 3 : add a root&#x000A;         gtree [:0 (into [] forest)]]&#x000A;   [gtree src']))&#x000A;&#x000A;(first (rand-gentree (make-random 424242) 20))&#x000A;""</code></pre>
+</div>
+</div>
+<div class="literalblock slide">
+<div class="content">
+<pre>=&gt; that's all folks!</pre>
+</div>
+</div>
+<link rel="shortcut icon" href="./favicon.png">
+<link rel="stylesheet" media="screen" href="./styles/klipse.css">
+<link rel="stylesheet" media="screen" href="./styles/asciidoc-klipse.css">
+<link rel="stylesheet" media="screen" href="./klipse.css">
+
+
+<link rel="stylesheet" type="text/css" href="./styles/codemirror.css">
+
+<script>
+    window.klipse_settings = {
+     codemirror_options_in: {
+            lineWrapping: true,
+            autoCloseBrackets: true
+        },
+        codemirror_options_out: {
+            lineWrapping: true
+        },
+        beautify_strings: true,
+        selector: '.clj',
+        selector_js: '.transpile-cljs',
+        selector_reagent: '.reagent',
+        selector_eval_js: '.eval-js',
+    	selector_render_jsx: '.render-jsx',
+        selector_jsx: '.eval-jsx',
+        selector_es2017: '.es2017',
+        selector_brainfuck: '.brainfuck',
+        selector_transpile_jsx: '.transpile-jsx',
+        selector_eval_php: '.php',
+        selector_eval_python_client: '.python',
+        selector_eval_html: '.html',
+        selector_sql: '.sql',
+        selector_eval_ruby: '.ruby',
+        selector_eval_scheme: '.scheme',
+    selector_eval_cpp: '.cpp',
+    selector_lua: '.lua',
+    };
+</script>
+
+<script src="https://storage.googleapis.com/app.klipse.tech/plugin/js/klipse_plugin.js"></script>
+
+<!-- Place this tag in your head or just before your close body tag. -->
+<script async defer src="https://buttons.github.io/buttons.js"></script>
+</section>
+<div aria-role="navigation">
+<a class="deck-prev-link" href="#" title="Previous">&#8592;</a>
+<a class="deck-next-link" href="#" title="Next">&#8594;</a>
+</div>
+<p aria-role="status" class="deck-status">
+<span></span>
+powered by
+<a href="https://github.com/viebel/klipse" target="_new">Klipse</a>
+<span class="deck-status-current"></span>
+/
+<span class="deck-status-total"></span>
+</p>
+</div>
+<script src="deck.js/jquery.min.js"></script>
+<script src="deck.js/core/deck.core.js"></script>
+<script src="deck.js/extensions/menu/deck.menu.js"></script>
+<script src="deck.js/extensions/navigation/deck.navigation.js"></script>
+<script src="deck.js/extensions/status/deck.status.js"></script>
+<script>
+  (function($, deck, undefined) {
+    $.deck.defaults.keys['previous'] = [8, 33, 37, 39];
+    $.deck.defaults.keys['next'] = [13, 32, 34, 39];
+  
+    $.extend(true, $[deck].defaults, {
+        countNested: false
+    });
+  
+    $.deck('.slide');
+  })(jQuery, 'deck');
+</script>
+<style>
+  .slide.canvas-image {
+  -moz-background-size: cover;
+  -webkit-background-size: cover;
+  -o-background-size: cover;
+  background-size: cover;
+  display: -moz-box;
+  display: -webkit-box;
+  display: -ms-box;
+  display: box;
+  -moz-box-orient: vertical;
+  -webkit-box-orient: vertical;
+  -ms-box-orient: vertical;
+  box-orient: vertical;
+  -moz-box-align: start;
+  -webkit-box-align: start;
+  -ms-box-align: start;
+  box-align: start;
+  -moz-box-pack: start;
+  -webkit-box-pack: start;
+  -ms-box-pack: start;
+  box-pack: start;}
+  
+  .bottom-left {
+    left: 1%;
+    bottom: 20%; }
+  
+  .top-left {
+    left: 1%;
+    top: 20%; }
+  
+  .bottom-right {
+    right: 1%;
+    bottom: 20%; }
+  
+  .top-right {
+    right: 1%;
+    top: 20%; }
+  
+  .center-up {
+    right: 50%;
+    top: 1%;
+  }
+  
+  .center-down {
+    right: 50%;
+    bottom: 1%;
+  }
+  .canvas-image .canvas-caption p {
+    text-align: center;
+    padding-top: 0;
+    padding: 0;
+    -moz-transform: none;
+    -webkit-transform: none;
+    -o-transform: none;
+    -ms-transform: none;
+    transform: none;
+    display: inline;
+    position: absolute;
+    background-color: rgba(0, 0, 0, 0.7);
+    font-weight: bold;
+    font-size: 58px;
+    -webkit-box-shadow: 2px 2px 2px #000;
+    -moz-box-shadow: 2px 2px 2px #000;
+    box-shadow: 2px 2px 2px #000;
+    padding: 1rem;
+    color: white; }
+  kbd.keyseq { color: #555555; }
+  kbd:not(.keyseq) {
+    display: inline-block;
+    color: #222222;
+    font-size: 0.7em;
+    line-height: 1.4;
+    background-color: #F7F7F7;
+    border: 1px solid #ccc;
+    -webkit-border-radius: 3px;
+    border-radius: 3px;
+    -webkit-box-shadow: 0 1px 0 rgba(0, 0, 0, 0.2), 0 0 0 2px white inset;
+    box-shadow: 0 1px 0 rgba(0, 0, 0, 0.2), 0 0 0 2px white inset;
+    margin: -0.15em 0.15em 0 0.15em;
+    padding: 0.2em 0.6em;
+    vertical-align: middle;
+    white-space: nowrap;
+  }
+  kbd kbd:first-child { margin-left: 0; }
+  kbd kbd:last-child { margin-right: 0; }
+</style>
+</body>
+</html>

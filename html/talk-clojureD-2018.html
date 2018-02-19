@@ -1,0 +1,668 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta content="text/html; charset=utf-8" http-equiv="Content-Type">
+<meta content="IE=edge,chrome=1" http-equiv="X-UA-Compatible">
+<meta content="Asciidoctor 1.5.6.1" name="generator">
+<title>DIY fast random tree generation</title>
+<link href="deck.js/core/deck.core.css" rel="stylesheet">
+<link href="deck.js/extensions/menu/deck.menu.css" media="screen" rel="stylesheet">
+<link href="deck.js/extensions/navigation/deck.navigation.css" media="screen" rel="stylesheet">
+<link href="deck.js/extensions/status/deck.status.css" media="screen" rel="stylesheet">
+<link href="deck.js/themes/style/.css" media="screen" rel="stylesheet">
+<link href="deck.js/themes/transition/horizontal-slide.css" media="screen" rel="stylesheet">
+<link href="deck.js/core/print.css" media="print" rel="stylesheet">
+<script src="deck.js/modernizr.custom.js"></script>
+</head>
+<body class="article">
+<div class="deck-container">
+<section class="slide" id="title-slide">
+<h1>DIY fast random tree generation</h1>
+</section>
+<div id="preamble">
+<div class="sectionbody">
+<pre class="hidden"><code class="clj">
+(ns my.m$macros)
+(require '[reagent.core :as r])
+(require '[reagent.ratom :as ratom])
+
+</code></pre>
+</div>
+</div>
+<section class="slide" id="_diy_fast_random_tree_generation">
+<h2>DIY fast random tree generation</h2>
+<br/>
+<br/>
+<br/>
+  <div class="left">
+    <div>
+      <img width="200px" src="./images/clojureD.png"/>
+    </div>
+
+  <div>Berlin - Feb 24, 2018</div>
+  </div>
+<div class="left" style="padding-left: 30px;">
+<code data-loop-msec="1000" class="reagent" data-beautify-strings="true">
+;; A live-coding presentation made with klipse
+;; (thank you Yehonathan/viebel!)
+(defn showme [s] [:h3 (str s)])
+[:div (showme (js/Date.))]
+</code>
+</div>
+<br/>
+<br/>
+<br/>
+<br/>
+<br/>
+<br/>
+<br/>
+<div class="paragraph"><p><strong>Want to play with the slides?</strong><br>
+<a class="bare" href="https://goo.gl/DLB2H9">https://goo.gl/DLB2H9</a> (boltzmann) <a class="bare" href="https://goo.gl/ZhhrEk">https://goo.gl/ZhhrEk</a> (binary trees/complement)</p></div>
+<hr>
+<div class="openblock slide">
+<div class="content">
+<div class="paragraph"><p><strong>Who am I?</strong> <a href="mailto:frederic.peschanski@lip6.fr">frederic.peschanski@lip6.fr</a>&#8201;&#8212;&#8201;<a href="https://github.com/fredokun">fredokun @ github</a></p></div>
+<div class="ulist">
+<ul>
+<li>associate professor at <a href="http://www.sorbonne-university.com/">Sorbonne University</a> (ex-UPMC)</li>
+<li>researcher at the <a href="https://www.lip6.fr">Lip6</a> computer science laboratory</li>
+<li>(live) programming &amp; maths geek</li>
+<li>long-time Lisper (scheme, CL, clojure(script))</li>
+</ul>
+</div>
+</div>
+</div>
+<div class="openblock slide">
+<div class="content">
+<hr>
+<div class="paragraph"><p><strong>Warning!</strong> this presentation is <strong>code heavy</strong>! The whole source code is in the slides<br>
+&#8658; the final generator is about 100 lines of Clojure &#8230;&#8203;</p></div>
+</div>
+</div>
+</section>
+<section class="slide" id="_the_random_source">
+<h2>The random source &#8230;&#8203;</h2>
+<div class="paragraph"><p>Our goal is to generate (large) trees&#8230;&#8203;</p></div>
+<div class="paragraph"><p>It all starts with a good <strong>random source</strong>. For data generation we&#8217;ll<br>
+ go a long way with a good Pseudo Random Number Generator (PRNG).<br>
+&nbsp;&nbsp; &#8658; there&#8217;s a good one in <code>test.check</code></p></div>
+<div class="listingblock clj">
+<div class="content">
+<pre class="highlight"><code>(require '[clojure.test.check.random&#x000A;         :refer [make-random  ;; create source with seed&#x000A;	         split        ;; two generators from one&#x000A;		 rand-double  ;; uniform double in range [0.0;1.0[&#x000A;		 ]])&#x000A;&#x000A;(def src (make-random 424242))&#x000A;&#x000A;(let [[src' src''] (split src)] ;; XXX: why two? we need only one ...&#x000A;  [(rand-double src) (rand-double src') (rand-double src'')])&#x000A;""</code></pre>
+</div>
+</div>
+<div class="openblock slide">
+<div class="content">
+<div class="paragraph"><p>Our source: an incremental PRNG</p></div>
+<div class="listingblock clj">
+<div class="content">
+<pre class="highlight"><code>;; generate a double between 0.0 (inclusive) and 1.0 (exclusive)&#x000A;(defn next-double [src]&#x000A;  (let [[src' src''] (split src)] ;; XXX: throw src?&#x000A;    [(rand-double src') src'']))&#x000A;&#x000A;(next-double src)&#x000A;&#x000A;""</code></pre>
+</div>
+</div>
+</div>
+</div>
+</section>
+<section class="slide" id="_generating_trees">
+<h2>Generating trees</h2>
+<div class="openblock slide">
+<div class="content">
+<div class="paragraph"><p><strong>Why ?</strong><br>
+- trees everywhere:<br>
+    &nbsp; → elements/compounds (files/directories, shapes/groups,&#8230;&#8203;)<br>
+    &nbsp; → structured documents (sections/subsections,&#8230;&#8203;)<br>
+    &nbsp; → tree-shaped datastructures<br>
+    &nbsp; → expression trees (generating programs?),<br>
+    &nbsp; → etc.<br>
+- a non-trivial case study for <strong>uniform random generation</strong><br>
+- <strong>beautiful</strong> maths and algorithms</p></div>
+</div>
+</div>
+<div class="openblock slide">
+<div class="content">
+<div class="paragraph"><p><strong>How ?</strong><br>
+- use <code>spec</code> and <code>test.check</code>?<br>
+- ad-hoc algorithms for specific cases: binary trees and general trees<br>
+  (cf. &#8230;&#8203;.)<br>
+- generic algorithms: recursive method, <strong>boltzmann sampling</strong>, &#8230;&#8203;</p></div>
+</div>
+</div>
+</section>
+<section class="slide" id="_tree_generation_with_spec">
+<h2>Tree generation with spec</h2>
+<div class="paragraph"><p>Let&#8217;s try to generate <strong>binary trees</strong> with <code>spec</code>&#8230;&#8203;</p></div>
+<div class="listingblock clj">
+<div class="content">
+<pre class="highlight"><code>(require '[clojure.spec :as s])&#x000A;&#x000A;;; a spec for binary trees (with int labels)&#x000A;(s/def ::bintree&#x000A;  (s/or :tip nil?&#x000A;        :node (s/tuple ::label ::bintree ::bintree)))&#x000A;(s/def ::label int?)&#x000A;&#x000A;;; example&#x000A;(def ex-btree [1,&#x000A;               [2 nil nil],&#x000A;               [3 [4 nil,&#x000A;                   [5 nil nil]],&#x000A;               [6 nil nil]]])&#x000A;&#x000A;(s/valid? ::bintree ex-btree)</code></pre>
+</div>
+</div>
+<div class="openblock slide">
+<div class="content">
+<div class="paragraph"><p>Random generation with spec (via test.check):</p></div>
+<div class="listingblock clj">
+<div class="content">
+<pre class="highlight"><code>(s/exercise ::bintree 1)&#x000A;""</code></pre>
+</div>
+</div>
+</div>
+</div>
+<div class="openblock slide">
+<div class="content">
+<div class="paragraph"><p><strong>Observations</strong><br>
+- non-uniform generation: seems to be biased for small-ish trees<br>
+- lack of control: what if I want a bigger tree?</p></div>
+</div>
+</div>
+</section>
+<section class="slide" id="_generating_binary_trees_with_test_check">
+<h2>Generating binary trees with test.check</h2>
+<div class="paragraph"><p>Let&#8217;s try the dedicated support for recursive structures</p></div>
+<div class="listingblock clj">
+<div class="content">
+<pre class="highlight"><code>(require '[clojure.test.check.generators :as gen])&#x000A;&#x000A;(def node-gen (fn [inner-gen]&#x000A;                (gen/tuple gen/int inner-gen inner-gen)))&#x000A;&#x000A;(def bt-gen (gen/recursive-gen node-gen (gen/return nil)))&#x000A;&#x000A;(gen/generate bt-gen 10)&#x000A;""</code></pre>
+</div>
+</div>
+<div class="paragraph slide"><p><strong>Observations</strong><br>
+- non-uniform generation: also small-ish trees<br>
+- lack of control: the size parameter does not seem to "work" (for trees)&#8230;&#8203;</p></div>
+</section>
+<section class="slide" id="_uniformity">
+<h2>Uniformity?</h2>
+<div class="paragraph"><p>Unbiased sampling means sampling in the <strong>uniform</strong> distribution.</p></div>
+<div class="paragraph"><p>Defined for a <strong>combinatorial class</strong>:</p></div>
+<div class="ulist">
+<ul>
+<li class="slide">each object has a finite size <code>n</code></li>
+<li class="slide">there is a finite number <code>Cn</code> of objects of size <code>n</code></li>
+</ul>
+</div>
+<div class="paragraph slide"><p><strong>Uniform distribution</strong>: the probability of sampling an object<br>
+of size <code>n</code> is <code>(/ 1.0 Cn)</code></p></div>
+</section>
+<section class="slide" id="_tree_grammars">
+<h2>Tree grammars</h2>
+<div class="paragraph"><p>We spec a simple (map-based) DSL for <strong>tree grammars</strong>.</p></div>
+<div class="listingblock clj">
+<div class="content">
+<pre class="highlight"><code>(s/def ::grammar (s/map-of keyword? ::elem))&#x000A;&#x000A;(s/def ::elem (s/or :neutral ::neutral&#x000A;                    :atom ::atom&#x000A;                    :sum ::sum&#x000A;                    :prod ::prod&#x000A;                    :ref ::ref))&#x000A;&#x000A;(s/def ::neutral #{1}) ;; ≅ empty&#x000A;(s/def ::atom #{'z})   ;; an atom has size 1&#x000A;;; (+ &lt;e1&gt; &lt;e2&gt; ...) either ... or ...&#x000A;(s/def ::sum (s/cat :sum #{'+} :elems (s/+ ::elem)))&#x000A;;; (* &lt;e1&gt; &lt;e2&gt; ...) tupling&#x000A;(s/def ::prod (s/cat :prod #{'*} :elems (s/+ ::elem)))&#x000A;;; recursion&#x000A;(s/def ::ref keyword?)&#x000A;""</code></pre>
+</div>
+</div>
+<div class="openblock slide">
+<div class="content">
+<div class="paragraph"><p><strong>Example 1</strong>: binary trees</p></div>
+<div class="listingblock clj">
+<div class="content">
+<pre class="highlight"><code>(def bt-gram '{:btree (+ :tip :node)&#x000A;               :node (* z :btree :btree)&#x000A;               :tip (* 1)})&#x000A;&#x000A;(s/valid? ::grammar bt-gram)</code></pre>
+</div>
+</div>
+</div>
+</div>
+<div class="openblock slide">
+<div class="content">
+<div class="paragraph"><p><strong>Example 2</strong>: general trees</p></div>
+<div class="listingblock clj">
+<div class="content">
+<pre class="highlight"><code>(def gt-gram '{:gtree (* z :gtrees)&#x000A;               :gtrees (+ 1 :forest)&#x000A;	       :forest (* z :gtree :gtrees)})&#x000A;&#x000A;(s/valid? ::grammar gt-gram)</code></pre>
+</div>
+</div>
+</div>
+</div>
+</section>
+<section class="slide" id="_non_trivial_tree_grammars">
+<h2>Non-trivial tree grammars</h2>
+<div class="paragraph"><p><strong>Example</strong>:</p></div>
+<div class="listingblock clj">
+<div class="content">
+<pre class="highlight"><code>(def tt-gram '{:ttree (+ :one :two :three)&#x000A;               :one (* z)&#x000A;               :two (* z z :ttree :ttree)&#x000A;	       :three (* z z z :ttree :ttree :ttree)})&#x000A;&#x000A;(s/valid? ::grammar tt-gram)</code></pre>
+</div>
+</div>
+<div class="openblock">
+<div class="content">
+<div class="paragraph"><p><strong>Remark</strong>: <code>z</code> is "zed" &#8230;&#8203; power of <code>z</code> = size</p></div>
+<div class="paragraph"><p>thus <em>in english</em>: trees with internal nodes of arity either 2 and 3<br>
+such that:<br>
+ - the leaves have size 1,<br>
+ - the binary nodes have size 2<br>
+ - and the ternary nodes size 3.</p></div>
+</div>
+</div>
+</section>
+<section class="slide" id="_from_tree_grammars_to_generating_functions">
+<h2>From tree grammars to generating functions</h2>
+<div class="paragraph"><p>The tree grammars look suspiciously like equations&#8230;&#8203;</p></div>
+<div class="listingblock clj">
+<div class="content">
+<pre class="highlight"><code>'{:btree (+ :tip (* z :btree :btree))&#x000A;  :tip (* 1)}&#x000A;""</code></pre>
+</div>
+</div>
+<div class="paragraph slide"><p>&hellip; something like <code>btree(z) = 1 + z * btree(z)²</code></p></div>
+<div class="openblock slide">
+<div class="content">
+<div class="listingblock clj">
+<div class="content">
+<pre class="highlight"><code>(defn eval-elem [elem z prev]&#x000A;  (cond&#x000A;    (= elem 1) 1.0&#x000A;    (= elem 'z) z&#x000A;    (keyword? elem) (get prev elem)&#x000A;    :else (let [[op &amp; args] elem]&#x000A;      (case op&#x000A;        + (apply + (map #(eval-elem % z prev) args))&#x000A;        * (apply * (map #(eval-elem % z prev) args))))))&#x000A;&#x000A;(eval-elem '(* z :btree :btree) 0.25 {:btree 2.0, :tip 1.0, :node 2.0})&#x000A;""</code></pre>
+</div>
+</div>
+</div>
+</div>
+<div class="openblock slide">
+<div class="content">
+<div class="listingblock clj">
+<div class="content">
+<pre class="highlight"><code>(defn mapkv [f m]&#x000A;  (into {} (map (fn [[k v]] (f k v)) m)))&#x000A;&#x000A;(defn eval-grammar [grammar z prev]&#x000A;  (mapkv (fn [ref elem] [ref (eval-elem elem z prev)]) grammar))&#x000A;&#x000A;(eval-grammar bt-gram 0.25 {:btree 2.0 :tip 1.0 :node 2.0})&#x000A;""</code></pre>
+</div>
+</div>
+</div>
+</div>
+</section>
+<section class="slide" id="_boltzmann_sampling">
+<h2>Boltzmann sampling</h2>
+<div class="paragraph"><p>Sampling of an object with a Boltmann model (tree grammar) <code>C</code> of parameter <code>z</code>:</p></div>
+<hr>
+<div class="ulist">
+<ul>
+<li class="slide">if <code>C</code> is <code>1</code> (a constant) then return the empty object (of size 0)</li>
+<li class="slide">if <code>C</code> is <code>z</code> (an atom) then return the corresponding object of size 1</li>
+<li class="slide">if <code>C</code> is <code>(+ A B)</code>  (disjoint sum) then:<br>
+&nbsp; &nbsp; &nbsp; &nbsp; &#8658; return an object of <code>A</code> with probability <code>(/ (A z) (B z))</code><br>
+&nbsp; &nbsp; &nbsp; &nbsp; &#8658; otherwise return an object of <code>B</code></li>
+<li class="slide">if <code>C</code> is <code>(* A B)</code> generate a pair <code>[a b]</code> with <code>a</code> an object of <code>A</code> and <code>b</code> an object of <code>B</code></li>
+</ul>
+</div>
+<div class="openblock slide">
+<div class="content">
+<hr>
+<div class="paragraph"><p><strong>Guarantee:</strong> the sampling is uniform</p></div>
+<hr>
+<div class="paragraph"><p><strong>Remark</strong>: the control parameter is <code>z</code>, not (directly) the size of the tree.</p></div>
+</div>
+</div>
+<div class="paragraph slide"><p><strong>Questions:</strong><br>
+- what should be the value of <code>z</code>?<br>
+- how to compute efficiently the probabilities for disjoint sums?</p></div>
+</section>
+<section class="slide" id="_singular_sampling">
+<h2>Singular sampling</h2>
+<div class="paragraph"><p>What the underlying maths tell us about the generating functions<br>
+corresponding to tree grammars:<br>
+- they converge (i.e. are analytic) in 0<br>
+- there exists a radius of convergence between 0 (inclusive) and 1.0 (exclusive)</p></div>
+<div class="paragraph"><p>&#8658; The <strong>singularity</strong> is the limit of convergence for the generating functions</p></div>
+<div class="openblock slide">
+<div class="content">
+<hr>
+<div class="paragraph"><p><strong>Theorem</strong>: By choosing the singularity as the Boltzmann parameter,<br>
+the expected size of an object generated by a Boltmann sampler is <strong>infinite</strong>.</p></div>
+<hr>
+<div class="paragraph"><p><strong>Singular Boltzmann sampling</strong> = generating objects near or at the singularity.</p></div>
+</div>
+</div>
+<div class="paragraph slide"><p><strong>Question</strong>: how to find the singularity for a given tree grammar?</p></div>
+<div class="paragraph slide"><p>&nbsp; &nbsp; &nbsp; &#8658; numerical computation</p></div>
+</section>
+<section class="slide" id="_singularity_oracle">
+<h2>Singularity oracle</h2>
+<div class="listingblock clj">
+<div class="content">
+<pre class="highlight"><code>(declare iter)     ;; newton iteration&#x000A;(declare diverge?) ;; divergence (we went too far)&#x000A;&#x000A;;; Mr Oracle, please find the singularity&#x000A;(defn oracle [class zmin zmax eps-iter eps-div debug?]&#x000A;  (when debug? (println "[search] zmin=" zmin "zmax=" zmax))&#x000A;  (if (&lt; (- zmax zmin) eps-iter)&#x000A;    [zmin (iter class zmin eps-div true)]&#x000A;    (let [z (/ (+ zmin zmax)&#x000A;               2.0)&#x000A;          v (iter class z eps-div false)]&#x000A;      (when debug? (println "  =&gt; z=" z "v=" v))&#x000A;      (if (diverge? v eps-div)&#x000A;        (recur class zmin z eps-iter eps-div debug?)&#x000A;        (recur class z zmax eps-iter eps-div debug?)))))&#x000A;&#x000A;&#x000A;&#x000A;;; (oracle tt-gram 0.0 1.0 0.00001 0.00000001 true)&#x000A;&#x000A;;; (oracle gt-gram 0.0 1.0 0.001 0.000001 true)&#x000A;&#x000A;;; (oracle bt-gram 0.0 1.0 0.001 0.000001 true)&#x000A;&#x000A;""</code></pre>
+</div>
+</div>
+</section>
+<section class="slide" id="_convergence_vs_divergence_the_details">
+<h2>Convergence vs. divergence: the details</h2>
+<div class="paragraph"><p>&#8658; Newton iteration, cf. <a href="https://mitpress.mit.edu/sicp/full-text/book/book-Z-H-10.html#%_sec_1.1.7">SICP section 1.1.7</a></p></div>
+<div class="listingblock clj">
+<div class="content">
+<pre class="highlight"><code>;; distance between vectors v1 and v2&#x000A;(defn norm [v1 v2]&#x000A;  (reduce-kv (fn [norm elem y1]&#x000A;               (let [y2 (get v2 elem)&#x000A;                     y (Math/abs (- y1 y2))]&#x000A;                 (if (&gt; y norm) y norm))) 0.0 v1))&#x000A;&#x000A;(norm {:a 0.1 :b 0.3} {:a 0.2 :b -0.2})&#x000A;""</code></pre>
+</div>
+</div>
+<div class="listingblock clj">
+<div class="content">
+<pre class="highlight"><code>;; iteration until distance is less than `eps` (thank you Mr. Newton)&#x000A;(defn iter [gram z eps debug]&#x000A;  (loop [v1 (mapkv (fn [k _] [k 0.0]) gram)]&#x000A;    (let [v2 (eval-grammar gram z v1)]&#x000A;      ;; (when debug (println "[iter] v2=" v2 "norm=" (norm v1 v2)))&#x000A;      (if (&lt;= (norm v1 v2) eps)&#x000A;        v2&#x000A;        (recur v2)))))&#x000A;&#x000A;;; (oracle bt-gram 0.0 1.0 0.001 0.01 false)&#x000A;""</code></pre>
+</div>
+</div>
+<div class="listingblock clj">
+<div class="content">
+<pre class="highlight"><code>(defn some-kv [pred m]&#x000A;  (reduce-kv (fn [res k v]&#x000A;               (let [r (pred k v)]&#x000A;                 (if r&#x000A;                   (reduced r)&#x000A;                   res))) nil m))&#x000A;&#x000A;;; vector has diverged wrt. eps?&#x000A;(defn diverge? [v eps]&#x000A;  (some-kv (fn [_ w] (or (&lt; w 0.0) (&gt; w (/ 1.0 eps)))) v))&#x000A;&#x000A;""</code></pre>
+</div>
+</div>
+</section>
+<section class="slide" id="_weighted_grammars">
+<h2>Weighted grammars</h2>
+<div class="paragraph"><p>An interesting pre-computation is to calculate the weights of<br>
+the operands of disjoint sums (<code>+</code> operator)</p></div>
+<div class="listingblock clj">
+<div class="content">
+<pre class="highlight"><code>(defn weighted-args [args z weights]&#x000A;  (let [eargs (mapv (fn [arg] [arg (eval-elem arg z weights)]) args)&#x000A;        total (apply + (map second eargs))]&#x000A;    (loop [eargs eargs, acc 0.0, wargs []]&#x000A;      (if (seq eargs)&#x000A;        (let [[arg weight] (first eargs)&#x000A;              acc' (+ acc weight)]&#x000A;          (recur (rest eargs) acc' (conj wargs [arg (/ acc' total)])))&#x000A;        ;; no more arg&#x000A;        wargs))))&#x000A;&#x000A;(defn weighted-elem [elem z weights]&#x000A;  (cond&#x000A;    (#{1 'z} elem) elem&#x000A;    (keyword? elem) elem&#x000A;    :else (let [[kind &amp; args] elem]&#x000A;            (case kind&#x000A;              * elem&#x000A;              + (cons '+ (weighted-args args z weights))))))&#x000A;&#x000A;(defn weighted-gram [class z weights]&#x000A;  (mapkv (fn [ref elem] [ref (weighted-elem elem z weights)]) class))&#x000A;""</code></pre>
+</div>
+</div>
+</section>
+<section class="slide" id="_tree_grammar_examples">
+<h2>Tree grammar examples</h2>
+<div class="listingblock clj">
+<div class="content">
+<pre class="highlight"><code>;; binary trees&#x000A;(let [[z v] (oracle bt-gram 0.0 1.0 0.00001 0.000001 false)]&#x000A;  (def bt-sing z)&#x000A;  (def bt-wgram (weighted-gram bt-gram z v)))&#x000A;&#x000A;;; general trees&#x000A;(let [[z v] (oracle gt-gram 0.0 1.0 0.00001 0.000001 false)]&#x000A;  (def gt-sing z)&#x000A;  (def gt-wgram (weighted-gram gt-gram z v)))&#x000A;&#x000A;;; one-two-tree&#x000A;(let [[z v] (oracle tt-gram 0.0 1.0 0.00001 0.000001 false)]&#x000A;  (def tt-sing z)&#x000A;  (def tt-wgram (weighted-gram tt-gram z v)))&#x000A;""</code></pre>
+</div>
+</div>
+<div class="listingblock clj">
+<div class="content">
+<pre class="highlight"><code>tt-gram</code></pre>
+</div>
+</div>
+</section>
+<section class="slide" id="_non_deterministic_choice">
+<h2>Non-deterministic choice</h2>
+<div class="listingblock clj">
+<div class="content">
+<pre class="highlight"><code>(defn choose [src choices]&#x000A;  (let [[x src'] (next-double src)]&#x000A;    (some (fn [[elem proba]]&#x000A;            (and (&lt;= x proba) [src' elem]))&#x000A;	  choices)))&#x000A;&#x000A;(choose (make-random) [[1 0.5] [:two 0.8] [:three 1.0]])&#x000A;""</code></pre>
+</div>
+</div>
+</section>
+<section class="slide" id="_boltzmann_sampler">
+<h2>Boltzmann sampler</h2>
+<div class="paragraph"><p>Based on the weighted grammer, the random generator is rather simple<br>
+(but there&#8217;s an issue lurking, can you find it?)</p></div>
+<div class="listingblock clj">
+<div class="content">
+<pre class="highlight"><code>(declare product)&#x000A;&#x000A;(defn gentree [src wgram label elem]&#x000A;  (cond&#x000A;    (= elem 1) [src nil]&#x000A;    (= elem 'z) [src 'z]&#x000A;    (keyword? elem) (recur src wgram elem (get wgram elem))&#x000A;    :else (let [[op &amp; args] elem]&#x000A;      (case op&#x000A;        + (let [[src' choice] (choose src args)]&#x000A;            (gentree src' wgram label choice))&#x000A;        * (reduce (fn [[src v] arg]&#x000A;            (let [[src' res] (gentree src wgram label arg)]&#x000A;	      (if (#{nil 'z} res)&#x000A;                [src' v]&#x000A;                [src' (conj v res)]))) [src [label]] args)))))&#x000A;&#x000A;;; (gentree (make-random) tt-wgram :ttree :ttree)&#x000A;""</code></pre>
+</div>
+</div>
+<div class="paragraph slide"><p><strong>Problem</strong>: the generated tree is very often very small (e.g. size 1)<br>
+           and could be very (very very &#8230;&#8203;) large because:<br>
+- the Boltzmann distribution is largely biased ("peaked") towards small trees<br>
+- the expected size is infinite</p></div>
+<div class="paragraph slide"><p>&nbsp; &nbsp;&#8658; how to control the size?</p></div>
+</section>
+<section class="slide" id="_idea_1_computing_the_size_without_building_the_tree">
+<h2>Idea 1: Computing the size without building the tree</h2>
+<div class="paragraph"><p>but <strong>be careful</strong> with (very very &#8230;&#8203;) large trees</p></div>
+<div class="listingblock clj">
+<div class="content">
+<pre class="highlight"><code>;; (tail recursive) generation of size&#x000A;(defn gensize&#x000A;  [src wgram maxsize elem]&#x000A;   (loop [src src, elem elem, size 0, cont '()]&#x000A;     (if (&gt;= size maxsize) ;; &lt;== important!&#x000A;       [-1 src]&#x000A;       (cond&#x000A;         (nil? elem) (if (seq cont)&#x000A;                        (recur src (first cont) size (rest cont))&#x000A;                        [size src])&#x000A;         (= elem 1) (recur src nil size cont)&#x000A;         (= elem 'z) (recur src nil (inc size) cont)&#x000A;	 (keyword? elem) (recur src (get wgram elem) size cont)&#x000A;	 :else&#x000A;         (let [[op &amp; args] elem]&#x000A;           (case op&#x000A;             + (let [[src' elem'] (choose src args)]&#x000A;                 (recur src' elem' size cont))&#x000A;             * (recur src (first args) size (concat (rest args) cont))))))))&#x000A;&#x000A;;; (gensize (make-random) tt-wgram 1000 :ttree)&#x000A;""</code></pre>
+</div>
+</div>
+<div class="paragraph slide"><p><strong>Problem</strong>: many trees are small, the random source must be "heated" to<br>
+obtain better results</p></div>
+</section>
+<section class="slide" id="_heating_the_source">
+<h2>Heating the source</h2>
+<div class="listingblock clj">
+<div class="content">
+<pre class="highlight"><code>(defn gensizes [src wgram maxsize elem]&#x000A;  (let [[size src'] (gensize src wgram maxsize elem)]&#x000A;    (if (&gt; size 0)&#x000A;      (lazy-seq (cons [size src] (gensizes src' wgram maxsize elem)))&#x000A;      (recur src' wgram maxsize elem))))&#x000A;&#x000A;(take 20 (map first&#x000A;  (gensizes (make-random) tt-wgram 1000 :ttree)))&#x000A;""</code></pre>
+</div>
+</div>
+</section>
+<section class="slide" id="_idea_2_reject_small_ish_trees">
+<h2>Idea 2: reject small-ish trees</h2>
+<div class="paragraph"><p>&#8658; this is called <strong>rejection sampling</strong> &#8230;&#8203; but that&#8217;s just <code>filter</code>!</p></div>
+<div class="listingblock clj">
+<div class="content">
+<pre class="highlight"><code>(take 15 (map first (filter (fn [[size _]] (&gt; size 100))&#x000A;  (gensizes (make-random) tt-wgram 1000 :ttree))))&#x000A;""</code></pre>
+</div>
+</div>
+</section>
+<section class="slide" id="_the_boltzmann_sampler">
+<h2>The Boltzmann sampler</h2>
+<div class="listingblock clj">
+<div class="content">
+<pre class="highlight"><code>(defn boltzmann [src wgram sing elem min-size max-size]&#x000A;  (let [[size src'] (first (filter (fn [[size _]] (&gt;= size min-size))&#x000A;	                      (gensizes src wgram max-size elem)))&#x000A;	[src'' tree] (gentree src' wgram elem elem)]&#x000A;    [src'' size tree]))&#x000A;""</code></pre>
+</div>
+</div>
+<div class="paragraph slide"><p>but wait! There&#8217;s something&#8217;s fishy &#8230;&#8203;</p></div>
+<div class="paragraph slide"><p>&nbsp; &nbsp; &#8658; Our generator cannot generate a tree with one million nodes because &#8230;&#8203;</p></div>
+<div class="paragraph slide"><p><strong>because ???</strong></p></div>
+<div class="openblock slide">
+<div class="content">
+<div class="quoteblock">
+<blockquote>
+<div class="paragraph"><p>because <code>gentree</code> is not tail-recursive!</p></div>
+</blockquote>
+</div>
+<div class="paragraph"><p>(bummer!)</p></div>
+</div>
+</div>
+</section>
+<section class="slide" id="_tree_generation_tail_recursive">
+<h2>Tree generation (tail recursive)</h2>
+<div class="paragraph"><p>Looking for a Clojure Kata?</p></div>
+<div class="listingblock clj">
+<div class="content">
+<pre class="highlight"><code>(defn gentree' [src wgram maxsize elem]&#x000A;  (loop [src src, label elem, elem elem, size 0, cont '()]&#x000A;    (cond&#x000A;      (&gt;= size maxsize) [nil src]&#x000A;      (keyword? elem) (recur src elem (get wgram elem) size cont)&#x000A;      (= elem 1) (recur src nil nil size cont)&#x000A;      (seq? elem)&#x000A;      (let [[op &amp; args] elem]&#x000A;        (case op&#x000A;          + (let [[src' elem'] (choose src args)]&#x000A;              (recur src' label elem' size cont))&#x000A;          * (recur src label (first args) size (cons [label (rest args)] cont))))&#x000A;      :else&#x000A;      (let [[[node rst] &amp; cont'] cont]&#x000A;        (cond&#x000A;          (= elem 'z) (if (vector? node)&#x000A;                        (recur src nil nil (inc size) cont)&#x000A;                        (recur src nil nil (inc size) (cons [[node] rst] cont')))&#x000A;          (nil? elem)&#x000A;          (cond&#x000A;            (seq rst) (recur src nil (first rst) size (cons [node (rest rst)] cont'))&#x000A;            (seq cont')  (let [[[node' rst'] &amp; cont''] cont']&#x000A;                           (recur src nil nil size (cons [(conj node' node) rst'] cont'')))&#x000A;            :else [src node]))))))</code></pre>
+</div>
+</div>
+</section>
+<section class="slide" id="_a_generic_uniform_random_tree_generator_finally">
+<h2>A generic uniform random tree generator (finally&#8230;&#8203;)</h2>
+<div class="listingblock clj">
+<div class="content">
+<pre class="highlight"><code>(defn boltzmann' [src wgram sing elem min-size max-size]&#x000A;  (let [[size src'] (first (filter (fn [[size _]] (&gt;= size min-size))&#x000A;	                      (gensizes src wgram max-size elem)))&#x000A;	[src'' tree] (gentree' src' wgram elem elem)]&#x000A;    [src'' size tree]))&#x000A;""</code></pre>
+</div>
+</div>
+<div class="openblock slide">
+<div class="content">
+<div class="paragraph"><p>Generating one-two-three&#8217;s</p></div>
+<div class="listingblock clj">
+<div class="content">
+<pre class="highlight"><code>;; (boltzmann' (make-random) tt-wgram tt-sing :ttree 9 10)&#x000A;""</code></pre>
+</div>
+</div>
+</div>
+</div>
+<div class="openblock slide">
+<div class="content">
+<div class="paragraph"><p>Generating binary trees</p></div>
+<div class="listingblock clj">
+<div class="content">
+<pre class="highlight"><code>;; (boltzmann' (make-random) bt-wgram bt-sing :btree 10 30)&#x000A;""</code></pre>
+</div>
+</div>
+</div>
+</div>
+<div class="openblock slide">
+<div class="content">
+<div class="paragraph"><p>Generating general trees</p></div>
+<div class="listingblock clj">
+<div class="content">
+<pre class="highlight"><code>;; (boltzmann' (make-random) gt-wgram gt-sing :gtree 4 100)&#x000A;""</code></pre>
+</div>
+</div>
+</div>
+</div>
+</section>
+<section class="slide" id="_wrapup">
+<h2>Wrapup</h2>
+<div class="ulist">
+<ul>
+<li>random generation is (beautiful) science, art, and craft</li>
+<li>unbiased sampling should be the default (bias should be intentional)</li>
+<li>better automated testing is possible</li>
+<li>&#8230;&#8203; the missing part: generation by the recursive method</li>
+</ul>
+</div>
+<div class="openblock">
+<div class="content">
+
+</div>
+</div>
+<div class="openblock slide">
+<div class="content">
+<hr>
+<div class="paragraph"><p>(a lot) More on the topic?</p></div>
+<div class="quoteblock">
+<blockquote>
+<div class="paragraph"><p>Boltzmann Samplers for the Random Generation of Combinatorial Structures</p></div>
+<div class="attribution">
+<cite>Duchon, Flajollet, Louchard and Shaeffer, 2004</cite>
+</div>
+</blockquote>
+</div>
+<div class="paragraph"><p><a class="bare" href="http://algo.inria.fr/flajolet/Publications/DuFlLoSc04.pdf">http://algo.inria.fr/flajolet/Publications/DuFlLoSc04.pdf</a></p></div>
+</div>
+</div>
+<div class="openblock slide">
+<div class="content">
+<hr>
+<div class="paragraph"><p><strong>Thank you</strong>!</p></div>
+</div>
+</div>
+<link rel="shortcut icon" href="./favicon.png">
+<link rel="stylesheet" media="screen" href="./styles/klipse.css">
+<link rel="stylesheet" media="screen" href="./styles/asciidoc-klipse.css">
+<link rel="stylesheet" media="screen" href="./klipse.css">
+
+
+<link rel="stylesheet" type="text/css" href="./styles/codemirror.css">
+
+<script>
+    window.klipse_settings = {
+     codemirror_options_in: {
+            lineWrapping: true,
+            autoCloseBrackets: true
+        },
+        codemirror_options_out: {
+            lineWrapping: true
+        },
+        beautify_strings: true,
+        selector: '.clj',
+        selector_js: '.transpile-cljs',
+        selector_reagent: '.reagent',
+        selector_eval_js: '.eval-js',
+    	selector_render_jsx: '.render-jsx',
+        selector_jsx: '.eval-jsx',
+        selector_es2017: '.es2017',
+        selector_brainfuck: '.brainfuck',
+        selector_transpile_jsx: '.transpile-jsx',
+        selector_eval_php: '.php',
+        selector_eval_python_client: '.python',
+        selector_eval_html: '.html',
+        selector_sql: '.sql',
+        selector_eval_ruby: '.ruby',
+        selector_eval_scheme: '.scheme',
+    selector_eval_cpp: '.cpp',
+    selector_lua: '.lua',
+    };
+</script>
+
+<script src="https://storage.googleapis.com/app.klipse.tech/plugin/js/klipse_plugin.js"></script>
+
+<!-- Place this tag in your head or just before your close body tag. -->
+<script async defer src="https://buttons.github.io/buttons.js"></script>
+</section>
+<div aria-role="navigation">
+<a class="deck-prev-link" href="#" title="Previous">&#8592;</a>
+<a class="deck-next-link" href="#" title="Next">&#8594;</a>
+</div>
+<p aria-role="status" class="deck-status">
+<span></span>
+powered by
+<a href="https://github.com/viebel/klipse" target="_new">Klipse</a>
+<span class="deck-status-current"></span>
+/
+<span class="deck-status-total"></span>
+</p>
+</div>
+<script src="deck.js/jquery.min.js"></script>
+<script src="deck.js/core/deck.core.js"></script>
+<script src="deck.js/extensions/menu/deck.menu.js"></script>
+<script src="deck.js/extensions/navigation/deck.navigation.js"></script>
+<script src="deck.js/extensions/status/deck.status.js"></script>
+<script>
+  (function($, deck, undefined) {
+    $.deck.defaults.keys['previous'] = [8, 33, 37, 39];
+    $.deck.defaults.keys['next'] = [13, 32, 34, 39];
+  
+    $.extend(true, $[deck].defaults, {
+        countNested: false
+    });
+  
+    $.deck('.slide');
+  })(jQuery, 'deck');
+</script>
+<style>
+  .slide.canvas-image {
+  -moz-background-size: cover;
+  -webkit-background-size: cover;
+  -o-background-size: cover;
+  background-size: cover;
+  display: -moz-box;
+  display: -webkit-box;
+  display: -ms-box;
+  display: box;
+  -moz-box-orient: vertical;
+  -webkit-box-orient: vertical;
+  -ms-box-orient: vertical;
+  box-orient: vertical;
+  -moz-box-align: start;
+  -webkit-box-align: start;
+  -ms-box-align: start;
+  box-align: start;
+  -moz-box-pack: start;
+  -webkit-box-pack: start;
+  -ms-box-pack: start;
+  box-pack: start;}
+  
+  .bottom-left {
+    left: 1%;
+    bottom: 20%; }
+  
+  .top-left {
+    left: 1%;
+    top: 20%; }
+  
+  .bottom-right {
+    right: 1%;
+    bottom: 20%; }
+  
+  .top-right {
+    right: 1%;
+    top: 20%; }
+  
+  .center-up {
+    right: 50%;
+    top: 1%;
+  }
+  
+  .center-down {
+    right: 50%;
+    bottom: 1%;
+  }
+  .canvas-image .canvas-caption p {
+    text-align: center;
+    padding-top: 0;
+    padding: 0;
+    -moz-transform: none;
+    -webkit-transform: none;
+    -o-transform: none;
+    -ms-transform: none;
+    transform: none;
+    display: inline;
+    position: absolute;
+    background-color: rgba(0, 0, 0, 0.7);
+    font-weight: bold;
+    font-size: 58px;
+    -webkit-box-shadow: 2px 2px 2px #000;
+    -moz-box-shadow: 2px 2px 2px #000;
+    box-shadow: 2px 2px 2px #000;
+    padding: 1rem;
+    color: white; }
+  kbd.keyseq { color: #555555; }
+  kbd:not(.keyseq) {
+    display: inline-block;
+    color: #222222;
+    font-size: 0.7em;
+    line-height: 1.4;
+    background-color: #F7F7F7;
+    border: 1px solid #ccc;
+    -webkit-border-radius: 3px;
+    border-radius: 3px;
+    -webkit-box-shadow: 0 1px 0 rgba(0, 0, 0, 0.2), 0 0 0 2px white inset;
+    box-shadow: 0 1px 0 rgba(0, 0, 0, 0.2), 0 0 0 2px white inset;
+    margin: -0.15em 0.15em 0 0.15em;
+    padding: 0.2em 0.6em;
+    vertical-align: middle;
+    white-space: nowrap;
+  }
+  kbd kbd:first-child { margin-left: 0; }
+  kbd kbd:last-child { margin-right: 0; }
+</style>
+</body>
+</html>
