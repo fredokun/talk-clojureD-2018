@@ -7,7 +7,7 @@ DEST=./docs
 
 all: main boltzmann bingen
 
-main: talk-clojureD-2018.html
+main: index.html talk-clojureD-2018.html
 
 boltzmann: talk-clojureD-2018-boltzmann.html
 
@@ -18,6 +18,7 @@ bingen: talk-clojureD-2018-bingen.html
 
 clean:
 	rm -f *~
+	rm -f $(DEST)/index.html
 	rm -f $(DEST)/talk-clojureD-2018.html
 	rm -f $(DEST)/talk-clojureD-2018-boltzmann.html
 	rm -f $(DEST)/talk-clojureD-2018-bingen.html
