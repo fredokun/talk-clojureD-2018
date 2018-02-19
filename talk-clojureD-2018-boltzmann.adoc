@@ -1,0 +1,985 @@
+= DIY fast random tree generation
+:encoding: utf-8
+:navigation:
+:menu:
+:deckjs_theme:
+:status:
+:deckjs_transition: horizontal-slide
+:hardbreaks:
+
+++++
+<pre class="hidden"><code class="clj">
+(ns my.m$macros)
+(require '[reagent.core :as r])
+(require '[reagent.ratom :as ratom])
+
+</code></pre>
+++++
+
+== DIY fast random tree generation
+
+++++
+<br/>
+<br/>
+<br/>
+  <div class="left">
+    <div>
+      <img width="200px" src="./images/clojureD.png"/>
+    </div>
+  
+  <div>Berlin - Feb 24, 2018</div>
+  </div>
+++++
+
+++++
+<div class="left" style="padding-left: 30px;">
+<code data-loop-msec="1000" class="reagent" data-beautify-strings="true">
+;; A live-coding presentation made with klipse
+;; (thank you Yehonathan/viebel!)
+(defn showme [s] [:h3 (str s)])
+[:div (showme (js/Date.))]
+</code>
+</div>
+<br/>
+<br/>
+<br/>
+<br/>
+<br/>
+<br/>
+<br/>
+++++
+
+*Want to play with the slides?*
+https://goo.gl/DLB2H9 (boltzmann) https://goo.gl/ZhhrEk (binary trees/complement)
+
+'''
+
+[%step]
+--
+**Who am I?** frederic.peschanski@lip6.fr -- https://github.com/fredokun[fredokun @ github]
+
+- associate professor at http://www.sorbonne-university.com/[Sorbonne University] (ex-UPMC)
+- researcher at the https://www.lip6.fr[Lip6] computer science laboratory 
+- (live) programming & maths geek
+- long-time Lisper (scheme, CL, clojure(script))
+
+--
+
+
+== This talk
+
+[%step]
+--
+Goals:
+
+- discuss a hot topic in Clojure: *random generation*
+- show some *beautiful maths* (combinatorics)...
+--
+[%step]
+--
+- ... through (hopefully) intelligible and *interactive clojure*(script)
+--
+[%step]
+--
+&nbsp; &nbsp; => no greek letters !
+--
+
+[%step]
+--
+Non-goals:
+
+- yet another https://github.com/clojure/test.check[test.check] tutorial (cf. the excellent talk at Conj'17)
+- an academic lecture (not sure, you tell me)
+--
+
+[%step]
+--
+'''
+Thanks to:
+
+- *Antoine Genitrini* and *Mathieu Dien* for the trickiest maths part
+- *Yehonathan Sharvit* (viebel) for https://github.com/viebel/klipse[klipse]
+- *Clojure Paris* Meetup and *Hiram Madelaine* for shepherding
+--
+
+== Agenda
+
+- Random generation: arts & crafts
+- A generic generator based on Boltzmann sampling
+
+[%step]
+--
+'''
+*Warning!* this presentation is *code heavy*! The whole source code is in the slides
+=> the final generator is about 100 lines of Clojure ...
+
+[%step]
+we'll need to skip some parts (but you can play with the whole bunch online...DIY)
+--
+
+== Random generation: check-list
+
+Emily wants to generate some objects at *random*
+
+Important questions for Emily:
+
+[%step]
+
+- What kind of randomness ?
+  &nbsp; → truely random: non-determinism, unpredictability, non-reproducibility
+  &nbsp; → *pseudo random*: determinism, (un)predictability, reproducibility 
+
+[%step]
+
+- What is the distribution of the objects to generate?
+  &nbsp; → *unbiased sampling*: uniform distribution according to a given notion of size
+  &nbsp; → biased sampling: following a given statistical distribution
+  &nbsp; → don't know (don't care?) sampling
+
+[%step]
+
+- Characteristics ?
+  &nbsp; → expected sizes: small or *large* objects?
+  &nbsp; → statistical quality: periodicity, etc.
+  &nbsp; → performances: arithmetic complexity, memory usage, random-bit complexity (save the random bits!)
+
+== The random source ...
+
+It all starts with a good *random source*. For data generation we'll
+ go a long way with a good Pseudo Random Number Generator (PRNG).
+
+[%step]
+*Question*: a good (portable) PRNG for clojure/script?
+(goodness: uniformity, reproducibilty, efficiency
+&nbsp; => cf. https://www.gigabytes.it/data/prng/slides.pdf)
+
+[%step]
+++++
+<div class="paragraph slide">
+<table><tr>
+  <th><img src="https://imgs.xkcd.com/comics/random_number.png"/> <br/></th> </tr>
+  <tr><th style="text-align: left;">(<a align="left" href="https://xkcd.com/221/">https://xkcd.com/221/</a>) </th>
+</tr>
+</table>
+</div>
+++++
+
+
+[%step]
+&nbsp; => `(defn xkcd-random-number [] 4)`?
+
+[%step]
+&nbsp; => standard library (`rand`, etc.)?
+&nbsp; => https://github.com/jenanwise/rand-cljc[rand-cljc]?
+&nbsp; => https://github.com/clojure/test.check[test.check]?
+&nbsp; => a better source?
+
+
+== Random numbers in test.check
+
+[source,role="clj"]
+----
+(require '[clojure.test.check.random
+         :refer [make-random  ;; create source with seed
+	         split        ;; two generators from one
+		 rand-double  ;; uniform double in range [0.0;1.0[
+		 ]])
+	 
+(def src (make-random 424242))
+
+(let [[src' src''] (split src)] ;; XXX: why two? we need only one ...
+  [(rand-double src) (rand-double src') (rand-double src'')])
+""
+----
+
+[%step]
+--
+Our source: an incremental PRNG
+
+[source,role="clj"]
+----
+;; generate a double between 0.0 (inclusive) and 1.0 (exclusive)
+(defn next-double [src]
+  (let [[src' src''] (split src)] ;; XXX: throw src?
+    [(rand-double src') src'']))
+
+(next-double src)
+
+""
+----
+--
+
+== Generating trees
+
+[%step]
+--
+*Why ?*
+- trees everywhere:
+    &nbsp; → elements/compounds (files/directories, shapes/groups,...)
+    &nbsp; → structured documents (sections/subsections,...)
+    &nbsp; → tree-shaped datastructures
+    &nbsp; → expression trees (generating programs?),
+    &nbsp; → etc.
+- a non-trivial case study for *uniform random generation*
+- beautiful maths and algorithms
+--
+
+[%step]
+--
+*How ?*
+- "simple" ad hoc algorithms for specific cases: binary trees and general trees
+  (interactive presentation available as a complement)
+- more complex *generic* algorithms:
+    &nbsp; → recursive method (uniform, exact size, ≅ 10.000 nodes, not beautiful)
+    &nbsp; → *boltzmann sampling* (uniform, approx size, ≅ 1.000.000 nodes, beautiful)
+--
+
+== Example : binary trees
+
+[source, role="clj"]
+----
+(require '[clojure.spec :as s])
+
+;; a spec for binary trees (with int labels)
+(s/def ::bintree
+  (s/or :tip nil?
+        :node (s/tuple ::label ::bintree ::bintree)))
+(s/def ::label int?)
+
+;; example
+(def ex-btree [1,
+               [2 nil nil],
+               [3 [4 nil,
+                   [5 nil nil]],
+               [6 nil nil]]])
+
+(s/valid? ::bintree ex-btree)
+----
+
+[%step]
+--
+Random generation from spec (via test.check):
+
+[source, role="clj"]
+----
+(s/exercise ::bintree 1)
+""
+----
+--
+
+[%step]
+--
+*Observations*
+- non-uniform generation (it's biased but don't know how)
+- lack of control: biased towards small-ish trees
+--
+
+== Generating binary trees with test.check
+
+Let's try the dedicated support for recursive structures
+
+[source, role="clj"]
+----
+(require '[clojure.test.check.generators :as gen])
+
+(def node-gen (fn [inner-gen]
+                (gen/tuple gen/int inner-gen inner-gen)))
+
+(def bt-gen (gen/recursive-gen node-gen (gen/return nil)))
+
+(gen/generate bt-gen 10)
+""
+----
+
+[%step]
+
+*Observations*
+- non-uniform generation (it's biased but don't know how)
+- lack of control: small-ish trees
+
+== Uniformity?
+
+Unbiased sampling means sampling in the *uniform* distribution.
+
+Defined for a *combinatorial class*:
+[%step]
+- each object has a finite size `n`
+[%step]
+- there is a finite number `Cn` of objects of size `n`
+
+[%step]
+*Uniform distribution*: the probability of sampling an object
+of size `n` is `(/ 1.0 Cn)`
+  
+[%step]
+--
+'''
+*Example*: binary trees as a combinatorial class:
+[%step]
+- the size `n` of a tree is its number of (internal) nodes
+  Example: `[:a nil [:b [:c nil nil] nil]]` is of size 3
+[%step]
+- but what about `Cn`?
+[%step]
+&nbsp; &nbsp;&nbsp;&nbsp; => *Catalan numbers*
+--
+
+== Catalan numbers: counting binary trees
+
+[source, role="clj"]
+----
+;; a point = a node or a tip (a `nil`)
+(defn nb-points [n] (+ (* 2 n) 1))
+
+;; a tip = a `nil` value
+(defn nb-tips [n] (inc n))
+
+;; counting binary trees (https://oeis.org/A000108)
+(defn catalans
+  ([] (cons 1 (cons 1 (catalans 1 1))))
+  ([n Cn] (lazy-seq (let [Cn+1 (* (/ (* 2 (nb-points n))
+                                     (nb-tips (inc n)))
+	        		Cn)]
+		    (cons Cn+1 (catalans (inc n) Cn+1))))))
+		   
+(take 15 (catalans))
+""
+----
+
+[%step]
+--
+[source, role="clj"]
+----
+nil ;; tree of size 0
+""
+----
+--
+
+[%step]
+--
+[source, role="clj"]
+----
+[:a nil nil] ;; tree of size 1
+""
+----
+--
+
+[%step]
+--
+[source, role="clj"]
+----
+[:a [:b nil nil] nil] ;; trees of size 2
+[:a nil [:b nil nil]]
+""
+----
+--
+
+[%step]
+--
+[source, role="clj"]
+----
+[:a [:b nil nil] [:c nil nil]] ;; trees of size 3
+[:a [:b [:c nil nil] nil] nil]
+[:a [:b nil [:c nil nil]] nil]
+[:a nil [:b [:c nil nil] nil]]
+[:a nil [:b nil [:c nil nil]]]
+""
+----
+--
+
+[%step]
+&nbsp;  => this recursive definition leads to a beautiful algorithm for
+           generating binary trees uniformly at random (cf. complement).
+
+== Tree grammars
+
+We spec a simple (map-based) DSL for *tree grammars*.
+
+[source, role="clj"]
+----
+(s/def ::grammar (s/map-of keyword? ::elem))
+
+(s/def ::elem (s/or :neutral ::neutral
+                    :atom ::atom
+                    :sum ::sum
+                    :prod ::prod
+                    :ref ::ref))
+
+(s/def ::neutral #{1}) ;; ≅ empty
+(s/def ::atom #{'z})   ;; an atom has size 1
+;; (+ <e1> <e2> ...) either ... or ...
+(s/def ::sum (s/cat :sum #{'+} :elems (s/+ ::elem)))
+;; (* <e1> <e2> ...) tupling
+(s/def ::prod (s/cat :prod #{'*} :elems (s/+ ::elem)))
+;; recursion
+(s/def ::ref keyword?)
+""
+----
+
+[%step]
+--
+*Example 1*: binary trees
+
+[source, role="clj"]
+----
+(def bt-gram '{:btree (+ :tip :node)
+               :node (* z :btree :btree)
+               :tip (* 1)})
+
+(s/valid? ::grammar bt-gram)
+----
+--
+
+[%step]
+--
+*Example 2*: general trees
+
+[source, role="clj"]
+----
+(def gt-gram '{:gtree (* z :gtrees)
+               :gtrees (+ 1 :forest)
+	       :forest (* z :gtree :gtrees)})
+
+(s/valid? ::grammar gt-gram)
+----
+--
+
+== Non-trivial tree grammars
+
+*Example*:
+
+[source, role="clj"]
+----
+(def tt-gram '{:ttree (+ :one :two :three)
+               :one (* z)
+               :two (* z z :ttree :ttree)
+	       :three (* z z z :ttree :ttree :ttree)})
+
+(s/valid? ::grammar tt-gram)
+----
+
+[%step]
+
+*In english*: trees with internal nodes of arity either 2 and 3,
+such that the leaves have size 1, the binary nodes have size 2
+ and the ternary nodes size 3.
+
+[%step]
+
+&nbsp; => how to generate such trees uniformly at random?
+
+
+== From tree grammars to generating functions
+
+The tree grammars look suspiciously like equations...
+
+[source, role="clj"]
+----
+'{:btree (+ :tip (* z :btree :btree))
+  :tip (* 1)}
+""
+----
+
+*Functional equation*: `btree(z) = 1 + z * btree(z)²`
+
+[%step]
+--
+`btree(z)` is called a *generating function*, it is a power series of the form:
+
+   (reduce + (for [n (range)]
+               (* (coef n)
+               (Math/pow z n)))  ;; Algebraic Clojure, someday... 
+	  
+where `n` is the size of the generated objects, and `(coef n)` the number
+ of such objects. For binary trees it's the *Catalan numbers*.
+ 
+[source, role="clj"]
+----
+(take 15 (catalans))
+----
+--
+
+[%step]
+What the underlying maths tell us about the generating functions
+corresponding to tree grammars:
+- they converge (i.e. are analytic) in 0
+- there exists a radius of convergence between 0 (inclusive) and 1.0 (exclusive)
+  the limit point is called the (main) *singularity*
+
+
+== Boltzmann probability
+
+Suppose we have a tree grammar `C`
+The Boltzmann probabilty of an object `c` generated by this grammar is:
+
+    (/ (Math/pow z (size-of c))
+       (C z))
+
+- the `z` is the *Boltzmann parameter*
+- `(C z)` is the *evaluation* of the functional equation at that parameter.
+
+== Evaluation of functional equation
+
+*Remark*: because of recursion, we need to bootstrap the evaluation somehow...
+
+[source, role="clj"]
+----
+(defn eval-elem [elem z prev]
+  (cond
+    (= elem 1) 1.0
+    (= elem 'z) z
+    (keyword? elem) (get prev elem)
+    :else (let [[op & args] elem]
+      (case op
+        + (apply + (map #(eval-elem % z prev) args))
+        * (apply * (map #(eval-elem % z prev) args))))))
+
+(eval-elem '(* z :btree :btree) 0.25 {:btree 2.0, :tip 1.0, :node 2.0})
+""
+----
+
+[%step]
+--
+[source, role="clj"]
+----
+(defn mapkv [f m]
+  (into {} (map (fn [[k v]] (f k v)) m)))
+
+(defn eval-grammar [grammar z prev]
+  (mapkv (fn [ref elem] [ref (eval-elem elem z prev)]) grammar))
+
+(eval-grammar bt-gram 0.25 {:btree 2.0 :tip 1.0 :node 2.0})
+""
+----
+--
+
+== Boltzmann sampling
+
+Sampling of an object with a Boltmann model `C` of parameter `z`:
+
+- - -
+[%step]
+ - if `C` is `1` (a constant) then return the empty object (of size 0)
+[%step]
+ - if `C` is `z` (an atom) then return the corresponding object of size 1
+[%step]
+ - if `C` is `(+ A B)`  (disjoint sum) then:
+[%step]
+&nbsp; &nbsp; &nbsp; &nbsp; => return an object of `A` with probability `(/ (A z) (B z))`
+&nbsp; &nbsp; &nbsp; &nbsp; => otherwise return an object of `B`
+[%step]
+  - if `C` is `(* A B)` generate a pair `[a b]` with `a` an object of `A` and `b` an object of `B`
+
+[%step]
+--
+'''
+*Guarantee:* the sampling is uniform
+
+'''
+--
+
+[%step]
+*Questions:*
+- what should be the value of `z`?
+- how to compute efficiently the probabilities for disjoint sums?
+
+== Singular sampling
+
+The *singularity* is the limit of convergence for the generating functions
+
+- - -
+
+*Theorem*: By choosing the singularity as the Boltzmann parameter,
+the expected size of an object generated by a Boltmann sampler is *infinite*.
+
+- - -
+
+*Singular Boltzmann sampling* = generating objects near or at the singularity.
+
+[%step]
+*Question*: how to find the singularity for a given tree grammar?
+[%step]
+&nbsp; &nbsp; &nbsp; => numerical computation
+
+== Singularity oracle
+
+[source, role="clj"]
+----
+(declare iter)     ;; newton iteration
+(declare diverge?) ;; divergence (we went too far)
+
+;; Mr Oracle, please find the singularity
+(defn oracle [class zmin zmax eps-iter eps-div]
+  ;; (println "[search] zmin=" zmin "zmax=" zmax)
+  (if (< (- zmax zmin) eps-iter)
+    [zmin (iter class zmin eps-div true)]
+    (let [z (/ (+ zmin zmax)
+               2.0)
+          v (iter class z eps-div false)]
+      (if (diverge? v eps-div)
+        (recur class zmin z eps-iter eps-div)
+        (recur class z zmax eps-iter eps-div)))))
+
+
+
+;; (oracle tt-gram 0.0 1.0 0.00001 0.00000001)
+
+;; (oracle gt-gram 0.0 1.0 0.001 0.000001)
+
+;; (oracle bt-gram 0.0 1.0 0.001 0.000001)
+
+""
+----
+
+== The (numerical) details
+
+[source, role="clj"]
+----
+
+;; distance between vectors v1 and v2
+(defn norm [v1 v2]
+  (reduce-kv (fn [norm elem y1]
+               (let [y2 (get v2 elem)
+                     y (Math/abs (- y1 y2))]
+                 (if (> y norm) y norm))) 0.0 v1))
+
+(norm {:a 0.1 :b 0.3} {:a 0.2 :b -0.2})
+""
+----
+
+[source, role="clj"]
+----
+;; iteration until distance is less than `eps` (thank you Mr. Newton)
+(defn iter [gram z eps debug]
+  (loop [v1 (mapkv (fn [k _] [k 0.0]) gram)]
+    (let [v2 (eval-grammar gram z v1)]
+      ;; (when debug (println "[iter] v2=" v2 "norm=" (norm v1 v2)))
+      (if (<= (norm v1 v2) eps)
+        v2
+        (recur v2)))))
+
+;; (oracle bt-gram 0.0 1.0 0.001 0.01)
+"" 
+----
+
+[source, role="clj"]
+----
+(defn some-kv [pred m]
+  (reduce-kv (fn [res k v]
+               (let [r (pred k v)]
+                 (if r
+                   (reduced r)
+                   res))) nil m))
+
+;; vector has diverged wrt. eps?
+(defn diverge? [v eps]
+  (some-kv (fn [_ w] (or (< w 0.0) (> w (/ 1.0 eps)))) v))
+
+""
+----
+
+== Weighted grammars
+
+An interesting pre-computation is to calculate the weights of
+the operands of disjoint sums (`+` operator)
+
+[source, role="clj"]
+----
+(defn weighted-args [args z weights]
+  (let [eargs (mapv (fn [arg] [arg (eval-elem arg z weights)]) args)
+        total (apply + (map second eargs))]
+    (loop [eargs eargs, acc 0.0, wargs []]
+      (if (seq eargs)
+        (let [[arg weight] (first eargs)
+              acc' (+ acc weight)]
+          (recur (rest eargs) acc' (conj wargs [arg (/ acc' total)])))
+        ;; no more arg
+        wargs))))
+
+(defn weighted-elem [elem z weights]
+  (cond 
+    (#{1 'z} elem) elem
+    (keyword? elem) elem
+    :else (let [[kind & args] elem]
+            (case kind
+              * elem
+              + (cons '+ (weighted-args args z weights))))))
+
+(defn weighted-gram [class z weights]
+  (mapkv (fn [ref elem] [ref (weighted-elem elem z weights)]) class))
+""  
+----
+
+== Tree grammar examples
+
+[source, role="clj"]
+----
+
+;; binary trees
+(let [[z v] (oracle bt-gram 0.0 1.0 0.00001 0.000001)]
+  (def bt-sing z)
+  (def bt-wgram (weighted-gram bt-gram z v)))
+
+;; general trees
+(let [[z v] (oracle gt-gram 0.0 1.0 0.00001 0.000001)]
+  (def gt-sing z)
+  (def gt-wgram (weighted-gram gt-gram z v)))
+
+;; one-two-tree
+(let [[z v] (oracle tt-gram 0.0 1.0 0.00001 0.000001)]
+  (def tt-sing z)
+  (def tt-wgram (weighted-gram tt-gram z v)))
+""
+----
+
+[source, role="clj"]
+----
+tt-gram
+----
+
+
+
+== Non-deterministic choice
+
+[source, role="clj"]
+----
+(defn choose [src choices]
+  (let [[x src'] (next-double src)]
+    (some (fn [[elem proba]]
+            (and (<= x proba) [src' elem]))
+	  choices)))
+
+(choose (make-random) [[1 0.5] [:two 0.8] [:three 1.0]])
+""
+----
+
+== Boltzmann sampler
+
+Based on the weighted grammer, the random generator is rather simple
+(but there's an issue lurking, can you find it?)
+
+[source, role="clj"]
+----
+(declare product)
+
+(defn gentree [src wgram label elem]
+  (cond
+    (= elem 1) [src nil]
+    (= elem 'z) [src 'z]
+    (keyword? elem) (recur src wgram elem (get wgram elem))
+    :else (let [[op & args] elem]
+      (case op
+        + (let [[src' choice] (choose src args)]
+            (gentree src' wgram label choice))
+        * (reduce (fn [[src v] arg]
+            (let [[src' res] (gentree src wgram label arg)]
+	      (if (#{nil 'z} res)
+                [src' v]
+                [src' (conj v res)]))) [src [label]] args)))))
+
+;; (gentree (make-random) tt-wgram :ttree :ttree)
+""
+----
+
+[%step]
+*Problem*: the generated tree is very often very small (e.g. size 1)
+           and could be very (very very ...) large because:
+- the Boltzmann distribution is largely biased ("peaked") towards small trees
+- the expected size is infinite
+[%step]
+&nbsp; &nbsp;=> how to control the size?
+
+== Idea 1: Computing the size without building the tree
+
+but *be careful* with (very very ...) large trees
+
+[source, role="clj"]
+----
+;; (tail recursive) generation of size
+(defn gensize
+  [src wgram maxsize elem]
+   (loop [src src, elem elem, size 0, cont '()]
+     (if (>= size maxsize) ;; <== important!
+       [-1 src]
+       (cond
+         (nil? elem) (if (seq cont)
+                        (recur src (first cont) size (rest cont))
+                        [size src])
+         (= elem 1) (recur src nil size cont)
+         (= elem 'z) (recur src nil (inc size) cont)
+	 (keyword? elem) (recur src (get wgram elem) size cont)
+	 :else
+         (let [[op & args] elem]
+           (case op
+             + (let [[src' elem'] (choose src args)]
+                 (recur src' elem' size cont))
+             * (recur src (first args) size (concat (rest args) cont))))))))
+
+;; (gensize (make-random) tt-wgram 1000 :ttree)
+""
+----
+
+[%step]
+*Problem*: many trees are small, the random source must be "heated" to
+obtain better results
+
+== Heating the source
+
+[source, role="clj"]
+----
+(defn gensizes [src wgram maxsize elem]
+  (let [[size src'] (gensize src wgram maxsize elem)]
+    (if (> size 0)
+      (lazy-seq (cons [size src] (gensizes src' wgram maxsize elem)))
+      (recur src' wgram maxsize elem))))
+
+(take 20 (map first
+  (gensizes (make-random) tt-wgram 1000 :ttree)))
+""
+----
+
+== Idea 2: reject small-ish trees
+
+[source, role="clj"]
+----
+(take 15 (map first (filter (fn [[size _]] (> size 100))
+  (gensizes (make-random) tt-wgram 1000 :ttree))))
+""
+----
+
+== The Boltzmann sampler
+
+[source, role="clj"]
+----
+(defn boltzmann [src wgram sing elem min-size max-size]
+  (let [[size src'] (first (filter (fn [[size _]] (>= size min-size))
+	                      (gensizes src wgram max-size elem)))
+	[src'' tree] (gentree src' wgram elem elem)]
+    [src'' size tree]))
+""
+----
+
+[%step]
+but wait! There's something's fishy ...
+[%step]
+
+&nbsp; &nbsp; => Our generator cannot generate a tree with one million nodes because ...
+
+[%step]
+*because ???*
+
+[%step]
+--
+> because `gentree` is not tail-recursive!
+
+(bummer!)
+--
+== Tree generation (tail recursive)
+
+Looking for a Clojure Kata?
+
+[source, role="clj"]
+----
+(defn gentree' [src wgram maxsize elem]
+  (loop [src src, label elem, elem elem, size 0, cont '()]
+    (cond
+      (>= size maxsize) [nil src]
+      (keyword? elem) (recur src elem (get wgram elem) size cont)
+      (= elem 1) (recur src nil nil size cont)
+      (seq? elem)
+      (let [[op & args] elem]
+        (case op
+          + (let [[src' elem'] (choose src args)]
+              (recur src' label elem' size cont))
+          * (recur src label (first args) size (cons [label (rest args)] cont))))
+      :else 
+      (let [[[node rst] & cont'] cont]
+        (cond
+          (= elem 'z) (if (vector? node)
+                        (recur src nil nil (inc size) cont)
+                        (recur src nil nil (inc size) (cons [[node] rst] cont')))
+          (nil? elem)
+          (cond
+            (seq rst) (recur src nil (first rst) size (cons [node (rest rst)] cont'))
+            (seq cont')  (let [[[node' rst'] & cont''] cont']
+                           (recur src nil nil size (cons [(conj node' node) rst'] cont'')))
+            :else [src node]))))))
+----
+
+== A generic uniform random tree generator (finally...)
+
+[source, role="clj"]
+----
+(defn boltzmann' [src wgram sing elem min-size max-size]
+  (let [[size src'] (first (filter (fn [[size _]] (>= size min-size))
+	                      (gensizes src wgram max-size elem)))
+	[src'' tree] (gentree' src' wgram elem elem)]
+    [src'' size tree]))
+""
+----
+
+[%step]
+--
+Generating one-two-three's
+
+[source, role="clj"]
+----
+;; (boltzmann' (make-random) tt-wgram tt-sing :ttree 9 10)
+""
+----
+--
+
+[%step]
+--
+Generating binary trees
+
+[source, role="clj"]
+----
+;; (boltzmann' (make-random) bt-wgram bt-sing :btree 10 30)
+""
+----
+--
+
+[%step]
+--
+Generating general trees
+
+[source, role="clj"]
+----
+;; (boltzmann' (make-random) gt-wgram gt-sing :gtree 4 100)
+""
+----
+--
+
+== Wrapup
+
+- random generation is (beautiful) science, art, and craft
+
+- unbiased sampling should be the default (bias should be intentional)
+
+- better automated testing is possible
+
+- ... the missing part: generation by the recursive method
+--
+--
+
+[%step]
+--
+'''
+(a lot) More on the topic?
+
+[, "Duchon, Flajollet, Louchard and Shaeffer, 2004"]
+""
+Boltzmann Samplers for the Random Generation of Combinatorial Structures
+""
+http://algo.inria.fr/flajolet/Publications/DuFlLoSc04.pdf
+--
+
+[%step]
+--
+'''
+*Thank you*!
+--
+
+include::klipse.adoc[]
+
