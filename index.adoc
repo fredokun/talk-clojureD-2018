@@ -51,11 +51,11 @@
 
 *Three interactive presentations*:
 
-- the actual talk at ClojureD: link:talk-clojured-2018.html
+- the https://fredokun.github.io/talk-clojureD-2018/talk-clojureD-2018.html[actual talk] at ClojureD
 
-- a more detailed presentation about Bolztmann sampling: link:talk-clojured-2018-bolzmann.html
+- a https://fredokun.github.io/talk-clojureD-2018/talk-clojureD-2018-boltzmann.html[more detailed presentation] about *Bolztmann sampling*
 
-- a complement presentation about the beautiful *bijective method* for the uniform random generation of binary trees and general trees: link:talk-clojured-2018-bingen.html 
+- a https://fredokun.github.io/talk-clojureD-2018/talk-clojureD-2018-bingen.html[complement presentation] about the beautiful *bijective method* for the uniform random generation of binary trees and general trees
 
 '''
 --
