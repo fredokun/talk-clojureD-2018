@@ -1,6 +1,6 @@
 #! /bin/sh
 
-cd html/
+cd docs/
 
 # clone deckjs repo if required
 if [ -d "deck.js/" ]; then
