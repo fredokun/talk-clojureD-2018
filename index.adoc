@@ -1,0 +1,71 @@
+= DIY fast random tree generation
+:encoding: utf-8
+:navigation:
+:menu:
+:deckjs_theme:
+:status:
+:deckjs_transition: horizontal-slide
+:hardbreaks:
+
+++++
+<pre class="hidden"><code class="clj">
+(ns my.m$macros)
+(require '[reagent.core :as r])
+(require '[reagent.ratom :as ratom])
+
+</code></pre>
+++++
+
+== DIY fast random tree generation
+
+++++
+<br/>
+<br/>
+<br/>
+  <div class="left">
+    <div>
+      <img width="200px" src="./images/clojureD.png"/>
+    </div>
+  
+  <div>Berlin - Feb 24, 2018</div>
+  </div>
+++++
+
+++++
+<div class="left" style="padding-left: 30px;">
+<code data-loop-msec="1000" class="reagent" data-beautify-strings="true">
+;; A live-coding presentation made with klipse
+;; (thank you Yehonathan/viebel!)
+(defn showme [s] [:h3 (str s)])
+[:div (showme (js/Date.))]
+</code>
+</div>
+<br/>
+<br/>
+<br/>
+<br/>
+<br/>
+<br/>
+<br/>
+++++
+
+*Three interactive presentations*:
+
+- the actual talk at ClojureD: https://fredokun.github.io/talk-clojureD-2018/talk-clojured-2018.html
+
+- a more detailed presentation about Bolztmann sampling: https://fredokun.github.io/talk-clojureD-2018/talk-clojured-2018-bolzmann.html
+
+- a complement presentation about the beautiful *bijective method* for the uniform random generation of binary trees and general trees: https://fredokun.github.io/talk-clojureD-2018/talk-clojured-2018-bingen.html 
+
+'''
+--
+**Who am I?** frederic.peschanski@lip6.fr -- https://github.com/fredokun[fredokun @ github]
+
+- associate professor at http://www.sorbonne-university.com/[Sorbonne University] (ex-UPMC)
+- researcher at the https://www.lip6.fr[Lip6] computer science laboratory 
+- (live) programming & maths geek
+- long-time Lisper (scheme, CL, clojure(script))
+--
+
+include::klipse.adoc[]
+
