@@ -1,5 +1,7 @@
 #! /bin/sh
 
+cd html/
+
 # clone deckjs repo if required
 if [ ! -d "deck.js/" ]; then
     echo "Installing deck.js ..."
