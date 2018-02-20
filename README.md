@@ -7,7 +7,7 @@ Copyright (C) 2018 Fréddéric Peschanski -- MIT License
 
 ## Pitch
 
-Random generation of structured data is becoming a big thing in Clojure: think [[spec](https://clojure.org/guides/spec), [test.check](https://github.com/clojure/test.check), etc. In this talk I will explain, in a maths-light livecode-heavy way, what makes a good random generator. I will ~~livecode~~explain a simple DSL and a very fast random generator for tree-shaped structures in Clojure(Script**. I will use a powerful technique known as **Boltzmann sampling**. Sounds hard? You’ll see … it’s beautifully simple and incredibly efficient!
+Random generation of structured data is becoming a big thing in Clojure: think [spec](https://clojure.org/guides/spec), [test.check](https://github.com/clojure/test.check), etc. In this talk I will explain, in a maths-light livecode-heavy way, what makes a good random generator. I will ~~livecode~~explain a simple DSL and a very fast random generator for tree-shaped structures in Clojure(Script**. I will use a powerful technique known as **Boltzmann sampling**. Sounds hard? You’ll see … it’s beautifully simple and incredibly efficient!
 
 ## Pointers
 
@@ -19,7 +19,7 @@ There are in fact three different presentations:
   
 ## Thanks
 
-The interactive presentation has been made using https://github.com/viebel/klipse[Klipse] courtesy of viebel (thank you Yeonathan!)
+The interactive presentation has been made using [klipse](https://github.com/viebel/klipse) courtesy of Yehonathan Sharvit (thank you!)
 
 Many thanks to Antoine Genitrini and Matthieu Dien for the underlying maths.
 
@@ -28,7 +28,7 @@ Many thanks to Antoine Genitrini and Matthieu Dien for the underlying maths.
 ## Setup
 
 The presentation has been written in asciidoc, following the setup proposed by viebel at: https://github.com/viebel/slides.klipse.tech
-(once again thank you Viebel!)
+(once again thank you Yehonathan!)
 
 To "compile" the slides (files with a `.adoc` extension), you'll need:
 
