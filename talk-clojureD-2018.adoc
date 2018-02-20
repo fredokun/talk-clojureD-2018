@@ -49,8 +49,9 @@
 <br/>
 ++++
 
-*Want to play with the presentation (and more)?*
+*Want to play with the presentation ?*
 &nbsp;&nbsp; => https://fredokun.github.io/talk-clojureD-2018
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; (repo: https://github.com/fredokun/talk-clojureD-2018) 
 
 '''
 
@@ -194,7 +195,7 @@ It all starts with a good *random source*. For data generation we'll
 
 [%step]
 --
-Our source: an incremental PRNG
+Our source: an immutable PRNG
 
 [source,role="clj"]
 ----
@@ -787,7 +788,7 @@ Based on the weighted grammer, the random generator is rather simple
     :else (let [[op & args] elem]
       (case op
         + (let [[src' choice] (choose src args)]
-            (gentree src' wgram label choice))
+            (recur src' wgram label choice))
         * (reduce (fn [[src v] arg]
             (let [[src' res] (gentree src wgram label arg)]
 	      (if (#{nil 'z} res)

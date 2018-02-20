@@ -56,8 +56,9 @@
 <br/>
 <br/>
 <br/>
-<div class="paragraph"><p><strong>Want to play with the presentation (and more)?</strong><br>
-&nbsp;&nbsp; &#8658; <a class="bare" href="https://fredokun.github.io/talk-clojureD-2018">https://fredokun.github.io/talk-clojureD-2018</a></p></div>
+<div class="paragraph"><p><strong>Want to play with the presentation ?</strong><br>
+&nbsp;&nbsp; &#8658; <a class="bare" href="https://fredokun.github.io/talk-clojureD-2018">https://fredokun.github.io/talk-clojureD-2018</a><br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; (repo: <a class="bare" href="https://github.com/fredokun/talk-clojureD-2018">https://github.com/fredokun/talk-clojureD-2018</a>)</p></div>
 <hr>
 <div class="openblock slide">
 <div class="content">
@@ -93,7 +94,7 @@
 </div>
 <div class="openblock slide">
 <div class="content">
-<div class="paragraph"><p>Our source: an incremental PRNG</p></div>
+<div class="paragraph"><p>Our source: an immutable PRNG</p></div>
 <div class="listingblock clj">
 <div class="content">
 <pre class="highlight"><code>;; generate a double between 0.0 (inclusive) and 1.0 (exclusive)&#x000A;(defn next-double [src]&#x000A;  (let [[src' src''] (split src)] ;; XXX: throw src?&#x000A;    [(rand-double src') src'']))&#x000A;&#x000A;(next-double (make-random 424242))&#x000A;""</code></pre>
@@ -362,7 +363,7 @@ the operands of disjoint sums (<code>+</code> operator)</p></div>
 (but there&#8217;s an issue lurking, can you find it?)</p></div>
 <div class="listingblock clj">
 <div class="content">
-<pre class="highlight"><code>(defn gentree [src wgram label elem]&#x000A;  (cond&#x000A;    (= elem 1) [src nil]&#x000A;    (= elem 'z) [src 'z]&#x000A;    (keyword? elem) (recur src wgram elem (get wgram elem))&#x000A;    :else (let [[op &amp; args] elem]&#x000A;      (case op&#x000A;        + (let [[src' choice] (choose src args)]&#x000A;            (gentree src' wgram label choice))&#x000A;        * (reduce (fn [[src v] arg]&#x000A;            (let [[src' res] (gentree src wgram label arg)]&#x000A;	      (if (#{nil 'z} res)&#x000A;                [src' v]&#x000A;                [src' (conj v res)]))) [src [label]] args)))))&#x000A;&#x000A;;; (gentree (make-random) tt-wgram :ttree :ttree)&#x000A;""</code></pre>
+<pre class="highlight"><code>(defn gentree [src wgram label elem]&#x000A;  (cond&#x000A;    (= elem 1) [src nil]&#x000A;    (= elem 'z) [src 'z]&#x000A;    (keyword? elem) (recur src wgram elem (get wgram elem))&#x000A;    :else (let [[op &amp; args] elem]&#x000A;      (case op&#x000A;        + (let [[src' choice] (choose src args)]&#x000A;            (recur src' wgram label choice))&#x000A;        * (reduce (fn [[src v] arg]&#x000A;            (let [[src' res] (gentree src wgram label arg)]&#x000A;	      (if (#{nil 'z} res)&#x000A;                [src' v]&#x000A;                [src' (conj v res)]))) [src [label]] args)))))&#x000A;&#x000A;;; (gentree (make-random) tt-wgram :ttree :ttree)&#x000A;""</code></pre>
 </div>
 </div>
 <div class="paragraph slide"><p><strong>Problem</strong>: the generated tree is very often very small (e.g. size 1)<br>
