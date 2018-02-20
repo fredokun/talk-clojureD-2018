@@ -1,19 +1,17 @@
 
-PHONY=
-
 ADOC=asciidoctor -T templates/haml
 
 DEST=./docs
 
 all: main boltzmann bingen
 
-main: index.html talk-clojureD-2018.html
+main: $(DEST)/index.html $(DEST)/talk-clojureD-2018.html
 
-boltzmann: talk-clojureD-2018-boltzmann.html
+boltzmann: $(DEST)/talk-clojureD-2018-boltzmann.html
 
-bingen: talk-clojureD-2018-bingen.html
+bingen: $(DEST)/talk-clojureD-2018-bingen.html
 
-%.html: %.adoc
+$(DEST)/%.html: %.adoc
 	$(ADOC) -D $(DEST) $<
 
 clean:
