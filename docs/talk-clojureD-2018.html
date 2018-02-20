@@ -56,8 +56,8 @@
 <br/>
 <br/>
 <br/>
-<div class="paragraph"><p><strong>Want to play with the slides?</strong><br>
-<a class="bare" href="https://goo.gl/DLB2H9">https://goo.gl/DLB2H9</a> (boltzmann) <a class="bare" href="https://goo.gl/ZhhrEk">https://goo.gl/ZhhrEk</a> (binary trees/complement)</p></div>
+<div class="paragraph"><p><strong>Want to play with the presentation (and more)?</strong><br>
+&nbsp;&nbsp; &#8658; <a class="bare" href="https://fredokun.github.io/talk-clojureD-2018">https://fredokun.github.io/talk-clojureD-2018</a></p></div>
 <hr>
 <div class="openblock slide">
 <div class="content">
@@ -88,7 +88,7 @@
 &nbsp;&nbsp; &#8658; there&#8217;s a good one in <code>test.check</code></p></div>
 <div class="listingblock clj">
 <div class="content">
-<pre class="highlight"><code>(require '[clojure.test.check.random&#x000A;         :refer [make-random  ;; create source with seed&#x000A;	         split        ;; two generators from one&#x000A;		 rand-double  ;; uniform double in range [0.0;1.0[&#x000A;		 ]])&#x000A;&#x000A;(def src (make-random 424242))&#x000A;&#x000A;(let [[src' src''] (split src)] ;; XXX: why two? we need only one ...&#x000A;  [(rand-double src) (rand-double src') (rand-double src'')])&#x000A;""</code></pre>
+<pre class="highlight"><code>(require '[clojure.test.check.random&#x000A;         :refer [make-random  ;; create source with seed&#x000A;	         split        ;; two generators from one&#x000A;		 rand-double  ;; uniform double in range [0.0;1.0[&#x000A;		 ]])&#x000A;""</code></pre>
 </div>
 </div>
 <div class="openblock slide">
@@ -96,7 +96,7 @@
 <div class="paragraph"><p>Our source: an incremental PRNG</p></div>
 <div class="listingblock clj">
 <div class="content">
-<pre class="highlight"><code>;; generate a double between 0.0 (inclusive) and 1.0 (exclusive)&#x000A;(defn next-double [src]&#x000A;  (let [[src' src''] (split src)] ;; XXX: throw src?&#x000A;    [(rand-double src') src'']))&#x000A;&#x000A;(next-double src)&#x000A;&#x000A;""</code></pre>
+<pre class="highlight"><code>;; generate a double between 0.0 (inclusive) and 1.0 (exclusive)&#x000A;(defn next-double [src]&#x000A;  (let [[src' src''] (split src)] ;; XXX: throw src?&#x000A;    [(rand-double src') src'']))&#x000A;&#x000A;(next-double (make-random 424242))&#x000A;""</code></pre>
 </div>
 </div>
 </div>
@@ -107,7 +107,7 @@
 <div class="openblock slide">
 <div class="content">
 <div class="paragraph"><p><strong>Why ?</strong><br>
-- trees everywhere:<br>
+- <a href="https://en.wikipedia.org/wiki/Tree_(data_structure)">trees</a> everywhere:<br>
     &nbsp; → elements/compounds (files/directories, shapes/groups,&#8230;&#8203;)<br>
     &nbsp; → structured documents (sections/subsections,&#8230;&#8203;)<br>
     &nbsp; → tree-shaped datastructures<br>
@@ -121,9 +121,8 @@
 <div class="content">
 <div class="paragraph"><p><strong>How ?</strong><br>
 - use <code>spec</code> and <code>test.check</code>?<br>
-- ad-hoc algorithms for specific cases: binary trees and general trees<br>
-  (cf. &#8230;&#8203;.)<br>
-- generic algorithms: recursive method, <strong>boltzmann sampling</strong>, &#8230;&#8203;</p></div>
+- <em>ad-hoc</em> algorithms for specific cases: <a href="https://fredokun.github.io/talk-clojureD-2018/talk-clojureD-2018-bingen.html">binary trees and general trees</a><br>
+- <em>generic</em> algorithms: recursive method, <strong>boltzmann sampling</strong>, &#8230;&#8203;</p></div>
 </div>
 </div>
 </section>
@@ -155,7 +154,7 @@
 </section>
 <section class="slide" id="_generating_binary_trees_with_test_check">
 <h2>Generating binary trees with test.check</h2>
-<div class="paragraph"><p>Let&#8217;s try the dedicated support for recursive structures</p></div>
+<div class="paragraph"><p><a href="https://github.com/clojure/test.check">test.check</a> has dedicated support for <strong>recursive structures</strong></p></div>
 <div class="listingblock clj">
 <div class="content">
 <pre class="highlight"><code>(require '[clojure.test.check.generators :as gen])&#x000A;&#x000A;(def node-gen (fn [inner-gen]&#x000A;                (gen/tuple gen/int inner-gen inner-gen)))&#x000A;&#x000A;(def bt-gen (gen/recursive-gen node-gen (gen/return nil)))&#x000A;&#x000A;(gen/generate bt-gen 10)&#x000A;""</code></pre>
@@ -256,7 +255,7 @@ such that:<br>
 </section>
 <section class="slide" id="_boltzmann_sampling">
 <h2>Boltzmann sampling</h2>
-<div class="paragraph"><p>Sampling of an object with a Boltmann model (tree grammar) <code>C</code> of parameter <code>z</code>:</p></div>
+<div class="paragraph"><p>Sampling of an object with a Boltmann model (tree expression) <code>C</code> of parameter <code>z</code>:</p></div>
 <hr>
 <div class="ulist">
 <ul>
@@ -353,7 +352,7 @@ the operands of disjoint sums (<code>+</code> operator)</p></div>
 <h2>Non-deterministic choice</h2>
 <div class="listingblock clj">
 <div class="content">
-<pre class="highlight"><code>(defn choose [src choices]&#x000A;  (let [[x src'] (next-double src)]&#x000A;    (some (fn [[elem proba]]&#x000A;            (and (&lt;= x proba) [src' elem]))&#x000A;	  choices)))&#x000A;&#x000A;(choose (make-random) [[1 0.5] [:two 0.8] [:three 1.0]])&#x000A;""</code></pre>
+<pre class="highlight"><code>(defn choose [src choices]&#x000A;  (let [[x src'] (next-double src)]&#x000A;    (some (fn [[elem proba]]&#x000A;            (and (&lt;= x proba) [src' elem]))&#x000A;	  choices)))&#x000A;&#x000A;(choose (make-random) [[:one 0.5] [:two 0.8] [:three 1.0]])&#x000A;""</code></pre>
 </div>
 </div>
 </section>
@@ -363,12 +362,12 @@ the operands of disjoint sums (<code>+</code> operator)</p></div>
 (but there&#8217;s an issue lurking, can you find it?)</p></div>
 <div class="listingblock clj">
 <div class="content">
-<pre class="highlight"><code>(declare product)&#x000A;&#x000A;(defn gentree [src wgram label elem]&#x000A;  (cond&#x000A;    (= elem 1) [src nil]&#x000A;    (= elem 'z) [src 'z]&#x000A;    (keyword? elem) (recur src wgram elem (get wgram elem))&#x000A;    :else (let [[op &amp; args] elem]&#x000A;      (case op&#x000A;        + (let [[src' choice] (choose src args)]&#x000A;            (gentree src' wgram label choice))&#x000A;        * (reduce (fn [[src v] arg]&#x000A;            (let [[src' res] (gentree src wgram label arg)]&#x000A;	      (if (#{nil 'z} res)&#x000A;                [src' v]&#x000A;                [src' (conj v res)]))) [src [label]] args)))))&#x000A;&#x000A;;; (gentree (make-random) tt-wgram :ttree :ttree)&#x000A;""</code></pre>
+<pre class="highlight"><code>(defn gentree [src wgram label elem]&#x000A;  (cond&#x000A;    (= elem 1) [src nil]&#x000A;    (= elem 'z) [src 'z]&#x000A;    (keyword? elem) (recur src wgram elem (get wgram elem))&#x000A;    :else (let [[op &amp; args] elem]&#x000A;      (case op&#x000A;        + (let [[src' choice] (choose src args)]&#x000A;            (gentree src' wgram label choice))&#x000A;        * (reduce (fn [[src v] arg]&#x000A;            (let [[src' res] (gentree src wgram label arg)]&#x000A;	      (if (#{nil 'z} res)&#x000A;                [src' v]&#x000A;                [src' (conj v res)]))) [src [label]] args)))))&#x000A;&#x000A;;; (gentree (make-random) tt-wgram :ttree :ttree)&#x000A;""</code></pre>
 </div>
 </div>
 <div class="paragraph slide"><p><strong>Problem</strong>: the generated tree is very often very small (e.g. size 1)<br>
-           and could be very (very very &#8230;&#8203;) large because:<br>
-- the Boltzmann distribution is largely biased ("peaked") towards small trees<br>
+           and could be rather infrequently very (very very &#8230;&#8203;) large because:<br>
+- the Boltzmann distribution of sizes is largely biased ("peaked") towards small trees<br>
 - the expected size is infinite</p></div>
 <div class="paragraph slide"><p>&nbsp; &nbsp;&#8658; how to control the size?</p></div>
 </section>
@@ -426,7 +425,7 @@ obtain better results</p></div>
 <div class="paragraph"><p>Looking for a Clojure Kata?</p></div>
 <div class="listingblock clj">
 <div class="content">
-<pre class="highlight"><code>(defn gentree' [src wgram maxsize elem]&#x000A;  (loop [src src, label elem, elem elem, size 0, cont '()]&#x000A;    (cond&#x000A;      (&gt;= size maxsize) [nil src]&#x000A;      (keyword? elem) (recur src elem (get wgram elem) size cont)&#x000A;      (= elem 1) (recur src nil nil size cont)&#x000A;      (seq? elem)&#x000A;      (let [[op &amp; args] elem]&#x000A;        (case op&#x000A;          + (let [[src' elem'] (choose src args)]&#x000A;              (recur src' label elem' size cont))&#x000A;          * (recur src label (first args) size (cons [label (rest args)] cont))))&#x000A;      :else&#x000A;      (let [[[node rst] &amp; cont'] cont]&#x000A;        (cond&#x000A;          (= elem 'z) (if (vector? node)&#x000A;                        (recur src nil nil (inc size) cont)&#x000A;                        (recur src nil nil (inc size) (cons [[node] rst] cont')))&#x000A;          (nil? elem)&#x000A;          (cond&#x000A;            (seq rst) (recur src nil (first rst) size (cons [node (rest rst)] cont'))&#x000A;            (seq cont')  (let [[[node' rst'] &amp; cont''] cont']&#x000A;                           (recur src nil nil size (cons [(conj node' node) rst'] cont'')))&#x000A;            :else [src node]))))))</code></pre>
+<pre class="highlight"><code>(defn gentree' [src wgram maxsize elem]&#x000A;  (loop [src src, label elem, elem elem, size 0, cont '()]&#x000A;    (cond&#x000A;      (&gt;= size maxsize) [nil src]&#x000A;      (keyword? elem) (recur src elem (get wgram elem) size cont)&#x000A;      (= elem 1) (recur src nil nil size cont)&#x000A;      (seq? elem)&#x000A;      (let [[op &amp; args] elem]&#x000A;        (case op&#x000A;          + (let [[src' elem'] (choose src args)]&#x000A;              (recur src' label elem' size cont))&#x000A;          * (recur src label (first args) size (cons [label (rest args)] cont))))&#x000A;      :else&#x000A;      (let [[[node rst] &amp; cont'] cont]&#x000A;        (cond&#x000A;          (= elem 'z) (if (vector? node)&#x000A;                        (recur src nil nil (inc size) cont)&#x000A;                        (recur src nil nil (inc size) (cons [[node] rst] cont')))&#x000A;          (nil? elem)&#x000A;          (cond&#x000A;            (seq rst) (recur src nil (first rst) size (cons [node (rest rst)] cont'))&#x000A;            (seq cont')  (let [[[node' rst'] &amp; cont''] cont']&#x000A;                           (recur src nil nil size (cons [(conj node' node) rst'] cont'')))&#x000A;            :else [src node]))))))&#x000A;""</code></pre>
 </div>
 </div>
 </section>

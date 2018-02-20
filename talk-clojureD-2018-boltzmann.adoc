@@ -1,4 +1,4 @@
-= DIY fast random tree generation
+= DIY fast random tree generation -- more about Boltzmann Sampling
 :encoding: utf-8
 :navigation:
 :menu:
