@@ -33,7 +33,6 @@
 <h2>DIY fast random tree generation</h2>
 <br/>
 <br/>
-<br/>
   <div class="left">
     <div>
       <img width="200px" src="./images/clojureD.png"/>
@@ -84,8 +83,10 @@
 <section class="slide" id="_the_random_source">
 <h2>The random source &#8230;&#8203;</h2>
 <div class="paragraph"><p>Our goal is to generate (large) trees&#8230;&#8203;</p></div>
-<div class="paragraph"><p>It all starts with a good <strong>random source</strong>. For data generation we&#8217;ll<br>
- go a long way with a good Pseudo Random Number Generator (PRNG).<br>
+<div class="paragraph"><p>It all starts with a good <strong>random source</strong>.<br>
+(goodness: uniformity, reproducibilty, efficiency<br>
+&nbsp; &#8658; cf. <a class="bare" href="https://www.gigabytes.it/data/prng/slides.pdf">https://www.gigabytes.it/data/prng/slides.pdf</a>)</p></div>
+<div class="paragraph"><p>For data generation we&#8217;ll go a long way with a good Pseudo Random Number Generator (PRNG).<br>
 &nbsp;&nbsp; &#8658; there&#8217;s a good one in <code>test.check</code></p></div>
 <div class="listingblock clj">
 <div class="content">

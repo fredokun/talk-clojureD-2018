@@ -21,7 +21,6 @@
 ++++
 <br/>
 <br/>
-<br/>
   <div class="left">
     <div>
       <img width="200px" src="./images/clojureD.png"/>
@@ -179,8 +178,11 @@ It all starts with a good *random source*. For data generation we'll
 
 Our goal is to generate (large) trees...
 
-It all starts with a good *random source*. For data generation we'll
- go a long way with a good Pseudo Random Number Generator (PRNG).
+It all starts with a good *random source*.
+(goodness: uniformity, reproducibilty, efficiency
+&nbsp; => cf. https://www.gigabytes.it/data/prng/slides.pdf)
+
+For data generation we'll go a long way with a good Pseudo Random Number Generator (PRNG).
 &nbsp;&nbsp; => there's a good one in `test.check`
 
 [source,role="clj"]
