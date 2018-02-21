@@ -130,7 +130,7 @@
 </section>
 <section class="slide" id="_tree_generation_with_spec">
 <h2>Tree generation with spec</h2>
-<div class="paragraph"><p>Let&#8217;s try to generate <strong>binary trees</strong> with <code>spec</code>&#8230;&#8203;</p></div>
+<div class="paragraph"><p>A spec of <strong>binary trees</strong> &#8230;&#8203;</p></div>
 <div class="listingblock clj">
 <div class="content">
 <pre class="highlight"><code>(require '[clojure.spec :as s])&#x000A;&#x000A;;; a spec for binary trees (with int labels)&#x000A;(s/def ::bintree&#x000A;  (s/or :tip nil?&#x000A;        :node (s/tuple ::label ::bintree ::bintree)))&#x000A;(s/def ::label int?)&#x000A;&#x000A;;; example&#x000A;(def ex-btree [1,&#x000A;               [2 nil nil],&#x000A;               [3 [4 nil,&#x000A;                   [5 nil nil]],&#x000A;               [6 nil nil]]])&#x000A;&#x000A;(s/valid? ::bintree ex-btree)</code></pre>
@@ -238,6 +238,7 @@ such that:<br>
 <div class="paragraph slide"><p>&hellip; something like <code>btree(z) = 1 + z * btree(z)²</code></p></div>
 <div class="openblock slide">
 <div class="content">
+<div class="paragraph"><p>Incremental evaluation of tree expressions &#8230;&#8203;</p></div>
 <div class="listingblock clj">
 <div class="content">
 <pre class="highlight"><code>(defn eval-elem [elem z prev]&#x000A;  (cond&#x000A;    (= elem 1) 1.0&#x000A;    (= elem 'z) z&#x000A;    (keyword? elem) (get prev elem)&#x000A;    :else (let [[op &amp; args] elem]&#x000A;      (case op&#x000A;        + (apply + (map #(eval-elem % z prev) args))&#x000A;        * (apply * (map #(eval-elem % z prev) args))))))&#x000A;&#x000A;(eval-elem '(* z :btree :btree) 0.25 {:btree 2.0, :tip 1.0, :node 2.0})&#x000A;""</code></pre>
@@ -247,6 +248,7 @@ such that:<br>
 </div>
 <div class="openblock slide">
 <div class="content">
+<div class="paragraph"><p>&hellip;  and tree grammars</p></div>
 <div class="listingblock clj">
 <div class="content">
 <pre class="highlight"><code>(defn mapkv [f m]&#x000A;  (into {} (map (fn [[k v]] (f k v)) m)))&#x000A;&#x000A;(defn eval-grammar [grammar z prev]&#x000A;  (mapkv (fn [ref elem] [ref (eval-elem elem z prev)]) grammar))&#x000A;&#x000A;(eval-grammar bt-gram 0.25 {:btree 2.0 :tip 1.0 :node 2.0})&#x000A;""</code></pre>
@@ -283,11 +285,11 @@ such that:<br>
 </section>
 <section class="slide" id="_singular_sampling">
 <h2>Singular sampling</h2>
-<div class="paragraph"><p>What the underlying maths tell us about the generating functions<br>
+<div class="paragraph"><p>What the underlying maths tell us about the functional equations<br>
 corresponding to tree grammars:<br>
 - they converge (i.e. are analytic) in 0<br>
 - there exists a radius of convergence between 0 (inclusive) and 1.0 (exclusive)</p></div>
-<div class="paragraph"><p>&#8658; The <strong>singularity</strong> is the limit of convergence for the generating functions</p></div>
+<div class="paragraph"><p>&#8658; The <strong>singularity</strong> is the limit of convergence</p></div>
 <div class="openblock slide">
 <div class="content">
 <hr>
@@ -341,7 +343,7 @@ the operands of disjoint sums (<code>+</code> operator)</p></div>
 <h2>Tree grammar examples</h2>
 <div class="listingblock clj">
 <div class="content">
-<pre class="highlight"><code>;; binary trees&#x000A;(let [[z v] (oracle bt-gram 0.0 1.0 0.00001 0.000001 false)]&#x000A;  (def bt-sing z)&#x000A;  (def bt-wgram (weighted-gram bt-gram z v)))&#x000A;&#x000A;;; general trees&#x000A;(let [[z v] (oracle gt-gram 0.0 1.0 0.00001 0.000001 false)]&#x000A;  (def gt-sing z)&#x000A;  (def gt-wgram (weighted-gram gt-gram z v)))&#x000A;&#x000A;;; one-two-tree&#x000A;(let [[z v] (oracle tt-gram 0.0 1.0 0.00001 0.000001 false)]&#x000A;  (def tt-sing z)&#x000A;  (def tt-wgram (weighted-gram tt-gram z v)))&#x000A;""</code></pre>
+<pre class="highlight"><code>;; binary trees&#x000A;(let [[z v] (oracle bt-gram 0.0 1.0 0.00001 0.000001 false)]&#x000A;  (def bt-sing z)&#x000A;  (def bt-wgram (weighted-gram bt-gram z v)))&#x000A;&#x000A;;; general trees&#x000A;(let [[z v] (oracle gt-gram 0.0 1.0 0.00001 0.000001 false)]&#x000A;  (def gt-sing z)&#x000A;  (def gt-wgram (weighted-gram gt-gram z v)))&#x000A;&#x000A;;; one-two-three trees&#x000A;(let [[z v] (oracle tt-gram 0.0 1.0 0.00001 0.000001 false)]&#x000A;  (def tt-sing z)&#x000A;  (def tt-wgram (weighted-gram tt-gram z v)))&#x000A;""</code></pre>
 </div>
 </div>
 <div class="listingblock clj">
