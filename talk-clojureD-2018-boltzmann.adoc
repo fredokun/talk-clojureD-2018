@@ -49,8 +49,9 @@
 <br/>
 ++++
 
-*Want to play with the slides?*
-https://goo.gl/DLB2H9 (boltzmann) https://goo.gl/ZhhrEk (binary trees/complement)
+*Want to play with the presentation ?*
+&nbsp;&nbsp; => https://fredokun.github.io/talk-clojureD-2018
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; (repo: https://github.com/fredokun/talk-clojureD-2018) 
 
 '''
 
