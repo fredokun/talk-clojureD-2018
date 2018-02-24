@@ -52,6 +52,10 @@
 &nbsp;&nbsp; => https://fredokun.github.io/talk-clojureD-2018
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp; (repo: https://github.com/fredokun/talk-clojureD-2018) 
 
+++++
+<small>(... thanks to Antoine & Mathieu (maths guys), Hiram and the Paris Clojure Meetup, and Yeonathan for Klipse...)</small> 
+++++
+
 '''
 
 [%step]
